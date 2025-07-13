@@ -2,6 +2,9 @@ mod cli;
 mod commands;
 mod git_repo;
 
+#[cfg(test)]
+mod test_utils;
+
 use clap::Parser;
 use cli::{Cli, Commands};
 

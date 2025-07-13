@@ -382,46 +382,60 @@ impl GitRepo {
 
     /// Check if there are any staged files in the index
     pub fn has_staged_changes(&self) -> Result<bool, Error> {
-        let mut index = self.repo.index().context("Failed to get repository index")?;
-        
+        let mut index = self
+            .repo
+            .index()
+            .context("Failed to get repository index")?;
+
         // If repository has no commits yet, any files in index are staged
         if self.repo.head().is_err() {
             return Ok(index.len() > 0);
         }
-        
+
         // Compare index tree with HEAD tree
         let head = self.repo.head().context("Failed to get HEAD")?;
-        let head_commit = head.peel_to_commit().context("Failed to peel HEAD to commit")?;
+        let head_commit = head
+            .peel_to_commit()
+            .context("Failed to peel HEAD to commit")?;
         let head_tree = head_commit.tree().context("Failed to get HEAD tree")?;
-        
+
         let index_tree_id = index.write_tree().context("Failed to write index tree")?;
-        
+
         Ok(head_tree.id() != index_tree_id)
     }
 
     /// Get diff object of staged changes
     pub fn get_staged_diff(&self) -> Result<git2::Diff, Error> {
-        let index = self.repo.index().context("Failed to get repository index")?;
-        
+        let index = self
+            .repo
+            .index()
+            .context("Failed to get repository index")?;
+
         let diff = if self.repo.head().is_err() {
             // No commits yet, diff against empty tree
-            let empty_tree = self.repo.treebuilder(None)?
+            let empty_tree = self
+                .repo
+                .treebuilder(None)?
                 .write()
                 .context("Failed to create empty tree")?;
             let empty_tree = self.repo.find_tree(empty_tree)?;
-            
-            self.repo.diff_tree_to_index(Some(&empty_tree), Some(&index), None)
+
+            self.repo
+                .diff_tree_to_index(Some(&empty_tree), Some(&index), None)
                 .context("Failed to create diff from empty tree to index")?
         } else {
             // Compare HEAD tree with index
             let head = self.repo.head().context("Failed to get HEAD")?;
-            let head_commit = head.peel_to_commit().context("Failed to peel HEAD to commit")?;
+            let head_commit = head
+                .peel_to_commit()
+                .context("Failed to peel HEAD to commit")?;
             let head_tree = head_commit.tree().context("Failed to get HEAD tree")?;
-            
-            self.repo.diff_tree_to_index(Some(&head_tree), Some(&index), None)
+
+            self.repo
+                .diff_tree_to_index(Some(&head_tree), Some(&index), None)
                 .context("Failed to create diff from HEAD to index")?
         };
-        
+
         Ok(diff)
     }
 
@@ -445,7 +459,7 @@ impl GitRepo {
             }
             true
         })?;
-        
+
         Ok(diff_text)
     }
 
@@ -940,22 +954,23 @@ mod tests {
         // Add a file and stage it
         repo.add_file("test.txt", "Hello World\n").unwrap();
         repo.add(&["test.txt"]).unwrap();
-        
+
         let diff = repo.diff_staged().unwrap();
         assert!(diff.contains("+Hello World"));
         assert!(diff.contains("test.txt"));
 
         // Commit the file
         repo.commit("Initial commit").unwrap();
-        
+
         // No staged changes after commit
         let diff = repo.diff_staged().unwrap();
         assert!(diff.is_empty());
 
         // Modify the file and stage
-        repo.add_file("test.txt", "Hello World\nSecond line\n").unwrap();
+        repo.add_file("test.txt", "Hello World\nSecond line\n")
+            .unwrap();
         repo.add(&["test.txt"]).unwrap();
-        
+
         let diff = repo.diff_staged().unwrap();
         assert!(diff.contains("+Second line"));
         assert!(diff.contains("test.txt"));
@@ -969,16 +984,16 @@ mod tests {
         // Add a file and stage it
         repo.add_file("test.txt", "Hello World\n").unwrap();
         repo.add(&["test.txt"]).unwrap();
-        
+
         // Test get_staged_diff returns a Diff object
         let diff_obj = repo.get_staged_diff().unwrap();
         assert_eq!(diff_obj.deltas().len(), 1);
-        
+
         // Test diff_to_string converts the Diff to string
         let diff_string = repo.diff_to_string(&diff_obj).unwrap();
         assert!(diff_string.contains("+Hello World"));
         assert!(diff_string.contains("test.txt"));
-        
+
         // Should be same as calling diff_staged directly
         let direct_diff = repo.diff_staged().unwrap();
         assert_eq!(diff_string, direct_diff);

@@ -1,0 +1,19 @@
+#!/bin/bash
+
+echo "Running pre-commit checks..."
+
+# Check formatting
+echo "Checking code formatting..."
+if ! cargo fmt --check; then
+    echo "❌ Code formatting check failed. Run 'cargo fmt' to fix."
+    exit 1
+fi
+
+# Run tests
+echo "Running tests..."
+if ! cargo test; then
+    echo "❌ Tests failed."
+    exit 1
+fi
+
+echo "✅ All pre-commit checks passed!"

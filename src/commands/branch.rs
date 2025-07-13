@@ -33,5 +33,3 @@ pub fn handle_branch() -> Result<(), Box<dyn std::error::Error>> {
     }
     Ok(())
 }
-
-
