@@ -217,14 +217,14 @@ impl GitRepo {
 
                 // Switch to the new branch
                 self.repo
-                    .set_head(&format!("refs/heads/{}", branch_name))
+                    .set_head(&format!("refs/heads/{branch_name}"))
                     .context("Failed to set HEAD to new branch")?;
             }
             Err(_) => {
                 // Repository has no commits, just switch HEAD to point to the new branch
                 // This creates an unborn branch
                 self.repo
-                    .set_head(&format!("refs/heads/{}", branch_name))
+                    .set_head(&format!("refs/heads/{branch_name}"))
                     .context("Failed to set HEAD to new branch")?;
             }
         }
@@ -234,7 +234,7 @@ impl GitRepo {
 
     pub fn checkout_branch(&self, branch_name: &str) -> Result<(), Error> {
         // Get the branch reference
-        let branch_ref = format!("refs/heads/{}", branch_name);
+        let branch_ref = format!("refs/heads/{branch_name}");
         let obj = self.repo.revparse_single(&branch_ref)?;
 
         // Checkout the branch
@@ -289,10 +289,9 @@ impl GitRepo {
 
     /// Add a remote repository
     pub fn add_remote(&self, name: &str, url: &str) -> Result<(), Error> {
-        self.repo.remote(name, url).context(format!(
-            "Failed to add remote '{}' with URL '{}'",
-            name, url
-        ))?;
+        self.repo
+            .remote(name, url)
+            .context(format!("Failed to add remote '{name}' with URL '{url}'"))?;
 
         Ok(())
     }
@@ -301,7 +300,7 @@ impl GitRepo {
     pub fn set_remote_url(&self, name: &str, url: &str) -> Result<(), Error> {
         self.repo
             .remote_set_url(name, url)
-            .context(format!("Failed to set URL for remote '{}'", name))?;
+            .context(format!("Failed to set URL for remote '{name}'"))?;
 
         Ok(())
     }
@@ -316,7 +315,7 @@ impl GitRepo {
                 let remote = self
                     .repo
                     .find_remote(name)
-                    .context(format!("Failed to find remote '{}'", name))?;
+                    .context(format!("Failed to find remote '{name}'"))?;
 
                 let url = remote.url().unwrap_or("<no url>").to_string();
 
@@ -345,13 +344,12 @@ impl GitRepo {
         let mut remote = self
             .repo
             .find_remote(remote_name)
-            .context(format!("Failed to find remote '{}'", remote_name))?;
+            .context(format!("Failed to find remote '{remote_name}'"))?;
 
-        let refspec = format!("refs/heads/{}:refs/heads/{}", branch_name, branch_name);
+        let refspec = format!("refs/heads/{branch_name}:refs/heads/{branch_name}");
 
         remote.push(&[&refspec], None).context(format!(
-            "Failed to push branch '{}' to remote '{}'",
-            branch_name, remote_name
+            "Failed to push branch '{branch_name}' to remote '{remote_name}'"
         ))?;
 
         Ok(())
@@ -389,7 +387,7 @@ impl GitRepo {
 
         // If repository has no commits yet, any files in index are staged
         if self.repo.head().is_err() {
-            return Ok(index.len() > 0);
+            return Ok(!index.is_empty());
         }
 
         // Compare index tree with HEAD tree

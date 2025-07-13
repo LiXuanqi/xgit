@@ -16,19 +16,19 @@ pub fn handle_branch() -> Result<(), Box<dyn std::error::Error>> {
             match selection {
                 Ok(chosen_branch) => match repo.checkout_branch(&chosen_branch) {
                     Ok(()) => {
-                        println!("Switched to branch: {}", chosen_branch);
+                        println!("Switched to branch: {chosen_branch}");
                     }
                     Err(e) => {
-                        eprintln!("Error switching to branch '{}': {}", chosen_branch, e);
+                        eprintln!("Error switching to branch '{chosen_branch}': {e}");
                     }
                 },
                 Err(err) => {
-                    eprintln!("Selection cancelled: {}", err);
+                    eprintln!("Selection cancelled: {err}");
                 }
             }
         }
         Err(e) => {
-            eprintln!("Error getting branches: {}", e);
+            eprintln!("Error getting branches: {e}");
         }
     }
     Ok(())
