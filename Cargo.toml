@@ -1,0 +1,11 @@
+[package]
+name = "xgit"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+clap = { version = "4.5.41", features = ["derive"] }
+git2 = { version = "0.20.2", default-features = false } # TODO: remove default-features = false in the future
+inquire = "0.7.5"
+tokio = { version = "1.46.1", features = ["full"] }
