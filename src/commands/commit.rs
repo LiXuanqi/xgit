@@ -1,5 +1,4 @@
-use crate::git_repo::GitRepo;
-use git2::Repository;
+use crate::{ai, git_repo::GitRepo};
 use std::fs;
 use std::process::Command;
 
@@ -57,10 +56,11 @@ fn ai_commit() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let repo = Repository::open(".")?;
+    // Get the diff for AI processing
+    let diff_text = git_repo.diff_staged()?;
 
     // Try to generate commit message with Claude
-    let generated_message = generate_commit_message(&repo)?;
+    let generated_message = ai::generate_commit_message(&diff_text)?;
 
     if let Some(message) = generated_message {
         // Write generated message to a temporary file with comment
@@ -95,61 +95,4 @@ fn ai_commit() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
-}
-
-fn generate_commit_message(
-    _repo: &Repository,
-) -> Result<Option<String>, Box<dyn std::error::Error>> {
-    // Use GitRepo's diff_staged method for cleaner code
-    let git_repo = GitRepo::open(".")?;
-    let diff_text = git_repo.diff_staged()?;
-
-    if diff_text.is_empty() {
-        return Ok(None);
-    }
-
-    // Prepare the prompt for Claude
-    let prompt = format!(
-        "Based on the following git diff, generate a conventional commit message.
-
-The message should follow this format:
-<type>[optional scope]: <description>
-
-[optional body]
-
-Choose type from: feat, fix, docs, style, refactor, test, chore
-Keep the description under 50 characters, use imperative mood, and capitalize the first letter.
-
-Respond with ONLY the commit message, no additional text or formatting.
-
-Git diff:
-{diff_text}"
-    );
-
-    // Call Claude CLI with JSON output
-    let output = Command::new("claude")
-        .arg("--print")
-        .arg("--output-format")
-        .arg("json")
-        .arg(&prompt)
-        .output();
-
-    match output {
-        Ok(output) if output.status.success() => {
-            let response = String::from_utf8_lossy(&output.stdout);
-
-            // Parse Claude CLI JSON response and extract the result field
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response)
-                && let Some(message) = json.get("result").and_then(|r| r.as_str())
-            {
-                let message = message.trim();
-                if !message.is_empty() {
-                    return Ok(Some(message.to_string()));
-                }
-            }
-
-            Ok(None)
-        }
-        _ => Ok(None), // Silently ignore errors to maintain graceful fallback
-    }
 }
