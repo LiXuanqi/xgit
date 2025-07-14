@@ -2,11 +2,23 @@
 
 echo "Running pre-commit checks..."
 
-# Check formatting
+# Check formatting and auto-fix if needed
 echo "Checking code formatting..."
 if ! cargo fmt --check; then
-    echo "❌ Code formatting check failed. Run 'cargo fmt' to fix."
-    exit 1
+    echo "🔧 Auto-fixing code formatting..."
+    cargo fmt
+    
+    # Check if any files were modified by cargo fmt
+    if [ -n "$(git diff --name-only)" ]; then
+        echo "📝 Adding formatted files to git..."
+        # Add only the files that were actually formatted (changed)
+        git add $(git diff --name-only)
+        echo "✅ Code formatting fixed and files added to staging area."
+    else
+        echo "✅ Code formatting fixed (no changes needed)."
+    fi
+else
+    echo "✅ Code formatting is already correct."
 fi
 
 # Run clippy
