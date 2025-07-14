@@ -303,6 +303,32 @@ impl GitRepo {
         Ok(branch_name.to_string())
     }
 
+    /// Get commit info for a specific branch (short hash + first line of message)
+    pub fn get_branch_commit_info(&self, branch: &str) -> Result<String, Error> {
+        // Get the commit that the branch points to
+        let branch_ref = format!("refs/heads/{branch}");
+        let reference = self
+            .repo
+            .find_reference(&branch_ref)
+            .context(format!("Failed to find branch reference: {branch_ref}"))?;
+        let commit_oid = reference
+            .target()
+            .ok_or_else(|| anyhow::anyhow!("Branch reference has no target"))?;
+        let commit = self
+            .repo
+            .find_commit(commit_oid)
+            .context("Failed to find commit")?;
+
+        // Get short hash (first 7 characters)
+        let short_hash = commit.id().to_string()[..7].to_string();
+
+        // Get commit message (first line only)
+        let message = commit.message().unwrap_or("No commit message");
+        let first_line = message.lines().next().unwrap_or("No commit message");
+
+        Ok(format!("{short_hash} {first_line}"))
+    }
+
     /// Add a remote repository
     pub fn add_remote(&self, name: &str, url: &str) -> Result<(), Error> {
         self.repo
@@ -1039,5 +1065,40 @@ mod tests {
         // Should be back on master
         let current_branch = repo.get_current_branch().unwrap();
         assert_eq!(current_branch, "master");
+    }
+
+    #[test]
+    fn get_branch_commit_info_works() {
+        let temp_dir = assert_fs::TempDir::new().unwrap();
+        let repo = GitRepoTestDecorator::new(GitRepo::init(temp_dir.path()).unwrap());
+
+        // Create an initial commit
+        repo.add_file_and_commit("test.txt", "content", "Initial commit message")
+            .unwrap();
+
+        // Get commit info for master branch
+        let commit_info = repo.get_branch_commit_info("master").unwrap();
+
+        // Should contain short hash (7 chars) and the message
+        assert!(commit_info.len() > 7); // At least hash + space + some message
+        assert!(commit_info.contains("Initial commit message"));
+
+        // Check format: should be "1234567 Initial commit message"
+        let parts: Vec<&str> = commit_info.splitn(2, ' ').collect();
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0].len(), 7); // Short hash should be 7 characters
+        assert_eq!(parts[1], "Initial commit message");
+
+        // Create a new branch with a different commit
+        repo.create_and_checkout_branch("feature").unwrap();
+        repo.add_file_and_commit("feature.txt", "feature content", "Add feature file")
+            .unwrap();
+
+        // Get commit info for the feature branch
+        let feature_commit_info = repo.get_branch_commit_info("feature").unwrap();
+        assert!(feature_commit_info.contains("Add feature file"));
+
+        // Master and feature should have different commit info
+        assert_ne!(commit_info, feature_commit_info);
     }
 }

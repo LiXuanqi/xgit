@@ -28,7 +28,7 @@ pub fn show_branch_stats() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}{}", branch_marker, style(&branch).cyan().bold());
 
         // Get branch commit info
-        if let Ok(commit_info) = get_branch_commit_info(&branch) {
+        if let Ok(commit_info) = repo.get_branch_commit_info(&branch) {
             println!("  {} {}", style("📝").blue(), style(commit_info).dim());
         }
 
@@ -61,18 +61,6 @@ pub fn show_branch_stats() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
-}
-
-fn get_branch_commit_info(branch: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let output = Command::new("git")
-        .args(["log", "-1", "--pretty=format:%h %s", branch])
-        .output()?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        Err("Failed to get commit info".into())
-    }
 }
 
 fn get_remote_tracking_info(branch: &str) -> Result<String, Box<dyn std::error::Error>> {
