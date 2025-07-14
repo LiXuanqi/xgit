@@ -2,6 +2,13 @@
 name = "xgit"
 version = "0.1.0"
 edition = "2024"
+description = "A enhanced AI-powered Git tool"
+license = "MIT"
+authors = ["Xuanqi Li<lixuanqi1995@gmail.com>"]
+repository = "https://github.com/LiXuanqi/gitx"
+homepage = "https://github.com/LiXuanqi/gitx"
+keywords = ["git", "cli", "ai", "commit", "branch"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 anyhow = "1.0.98"
