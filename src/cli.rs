@@ -12,4 +12,10 @@ pub struct Cli {
 pub enum Commands {
     /// Branch operations
     Branch {},
+    /// Create a commit (passthrough to git commit)
+    Commit {
+        /// Arguments to pass to git commit
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }
