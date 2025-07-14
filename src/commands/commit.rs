@@ -118,7 +118,7 @@ The message should follow this format:
 [optional body]
 
 Choose type from: feat, fix, docs, style, refactor, test, chore
-Keep the description under 50 characters and use imperative mood.
+Keep the description under 50 characters, use imperative mood, and capitalize the first letter.
 
 Respond with ONLY the commit message, no additional text or formatting.
 
