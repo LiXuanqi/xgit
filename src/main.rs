@@ -8,6 +8,7 @@ mod test_utils;
 
 use clap::Parser;
 use cli::{Cli, Commands};
+use console::style;
 
 #[tokio::main]
 async fn main() {
@@ -20,14 +21,14 @@ async fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("Error: {e}");
+        eprintln!("{} {}", style("✗").red().bold(), style(e).red());
         std::process::exit(1);
     }
 }
 
 fn handle_external_command(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     if args.is_empty() {
-        eprintln!("No command provided");
+        eprintln!("{} No command provided", style("✗").red().bold());
         std::process::exit(1);
     }
 
@@ -72,7 +73,10 @@ fn handle_external_command(args: &[String]) -> Result<(), Box<dyn std::error::Er
         commands::git_passthrough::git_passthrough(subcommand, remaining_args)
     } else {
         eprintln!(
-            "Command '{subcommand}' is not allowed. Use 'git {subcommand}' directly if needed."
+            "{} Command '{}' is not allowed. Use '{}' directly if needed.",
+            style("✗").red().bold(),
+            style(subcommand).yellow(),
+            style(format!("git {subcommand}")).cyan()
         );
         std::process::exit(1);
     }

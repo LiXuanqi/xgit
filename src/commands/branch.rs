@@ -1,4 +1,5 @@
 use crate::git_repo::GitRepo;
+use console::style;
 use inquire::Select;
 
 pub fn handle_branch() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,19 +17,36 @@ pub fn handle_branch() -> Result<(), Box<dyn std::error::Error>> {
             match selection {
                 Ok(chosen_branch) => match repo.checkout_branch(&chosen_branch) {
                     Ok(()) => {
-                        println!("Switched to branch: {chosen_branch}");
+                        println!(
+                            "{} Switched to branch: {}",
+                            style("✓").green().bold(),
+                            style(&chosen_branch).cyan()
+                        );
                     }
                     Err(e) => {
-                        eprintln!("Error switching to branch '{chosen_branch}': {e}");
+                        eprintln!(
+                            "{} Error switching to branch '{}': {}",
+                            style("✗").red().bold(),
+                            style(&chosen_branch).yellow(),
+                            style(e).red()
+                        );
                     }
                 },
                 Err(err) => {
-                    eprintln!("Selection cancelled: {err}");
+                    eprintln!(
+                        "{} Selection cancelled: {}",
+                        style("⚠").yellow().bold(),
+                        style(err).yellow()
+                    );
                 }
             }
         }
         Err(e) => {
-            eprintln!("Error getting branches: {e}");
+            eprintln!(
+                "{} Error getting branches: {}",
+                style("✗").red().bold(),
+                style(e).red()
+            );
         }
     }
     Ok(())

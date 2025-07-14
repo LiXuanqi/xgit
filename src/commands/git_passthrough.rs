@@ -1,3 +1,4 @@
+use console::style;
 use std::process::Command;
 
 /// Helper function to passthrough commands to git
@@ -16,7 +17,12 @@ pub fn git_passthrough(
             }
         }
         Err(e) => {
-            eprintln!("Error running git {subcommand}: {e}");
+            eprintln!(
+                "{} Error running git {}: {}",
+                style("✗").red().bold(),
+                style(subcommand).cyan(),
+                style(e).red()
+            );
             std::process::exit(1);
         }
     }

@@ -1,5 +1,6 @@
 use super::git_passthrough::git_passthrough;
 use crate::{ai, git_repo::GitRepo};
+use console::style;
 use std::fs;
 use std::process::Command;
 
@@ -38,7 +39,10 @@ fn ai_commit() -> Result<(), Box<dyn std::error::Error>> {
     let git_repo = GitRepo::open(".")?;
 
     if !git_repo.has_staged_changes()? {
-        eprintln!("No changes staged for commit.");
+        eprintln!(
+            "{} No changes staged for commit.",
+            style("⚠").yellow().bold()
+        );
         return Ok(());
     }
 
