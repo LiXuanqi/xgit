@@ -15,7 +15,7 @@ async fn main() {
     let cli = Cli::parse();
 
     let result = match &cli.command {
-        Commands::Branch {} => commands::branch::handle_branch(),
+        Commands::Branch { prune_merged } => commands::branch::handle_branch(*prune_merged),
         Commands::Commit { args } => commands::commit::handle_commit(args),
         Commands::External(args) => handle_external_command(args),
     };

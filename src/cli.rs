@@ -12,7 +12,11 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Branch operations
-    Branch {},
+    Branch {
+        /// Clean up local branches that have been merged and deleted remotely
+        #[arg(long)]
+        prune_merged: bool,
+    },
     /// Create a commit (passthrough to git commit)
     Commit {
         /// Arguments to pass to git commit
