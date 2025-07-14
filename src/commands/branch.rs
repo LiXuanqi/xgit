@@ -1,11 +1,16 @@
 use super::branch_prune::prune_merged_branches;
+use super::branch_stats::show_branch_stats;
 use crate::git_repo::GitRepo;
 use console::style;
 use inquire::Select;
 
-pub fn handle_branch(prune_merged: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn handle_branch(prune_merged: bool, stats: bool) -> Result<(), Box<dyn std::error::Error>> {
     if prune_merged {
         return prune_merged_branches();
+    }
+
+    if stats {
+        return show_branch_stats();
     }
     let repo = GitRepo::open(".")?;
 

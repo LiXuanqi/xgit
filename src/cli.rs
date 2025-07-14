@@ -16,6 +16,9 @@ pub enum Commands {
         /// Clean up local branches that have been merged and deleted remotely
         #[arg(long)]
         prune_merged: bool,
+        /// Show current branch and associated GitHub PR information
+        #[arg(long)]
+        stats: bool,
     },
     /// Create a commit (passthrough to git commit)
     Commit {

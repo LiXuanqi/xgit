@@ -289,6 +289,20 @@ impl GitRepo {
         }
     }
 
+    /// Get the current branch name
+    pub fn get_current_branch(&self) -> Result<String, Error> {
+        let head_target = self
+            .get_head_symbolic_target()
+            .context("Failed to get current branch from HEAD")?;
+
+        // Extract branch name from "refs/heads/branch_name"
+        let branch_name = head_target
+            .strip_prefix("refs/heads/")
+            .ok_or_else(|| anyhow::anyhow!("HEAD is not pointing to a branch"))?;
+
+        Ok(branch_name.to_string())
+    }
+
     /// Add a remote repository
     pub fn add_remote(&self, name: &str, url: &str) -> Result<(), Error> {
         self.repo
@@ -997,5 +1011,33 @@ mod tests {
         // Should be same as calling diff_staged directly
         let direct_diff = repo.diff_staged().unwrap();
         assert_eq!(diff_string, direct_diff);
+    }
+
+    #[test]
+    fn get_current_branch_works() {
+        let temp_dir = assert_fs::TempDir::new().unwrap();
+        let repo = GitRepoTestDecorator::new(GitRepo::init(temp_dir.path()).unwrap());
+
+        // Create an initial commit to establish the master branch
+        repo.add_file_and_commit("initial.txt", "initial content", "Initial commit")
+            .unwrap();
+
+        // Should be on master after the first commit
+        let current_branch = repo.get_current_branch().unwrap();
+        assert_eq!(current_branch, "master");
+
+        // Create and checkout a new branch
+        repo.create_and_checkout_branch("feature-branch").unwrap();
+
+        // Should now be on the new branch
+        let current_branch = repo.get_current_branch().unwrap();
+        assert_eq!(current_branch, "feature-branch");
+
+        // Switch back to master
+        repo.checkout_branch("master").unwrap();
+
+        // Should be back on master
+        let current_branch = repo.get_current_branch().unwrap();
+        assert_eq!(current_branch, "master");
     }
 }
