@@ -18,4 +18,16 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// Show git status (passthrough to git status)
+    Status {
+        /// Arguments to pass to git status
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Add files to staging area (passthrough to git add)
+    Add {
+        /// Arguments to pass to git add
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }

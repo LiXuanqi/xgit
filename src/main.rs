@@ -16,6 +16,8 @@ async fn main() {
     let result = match &cli.command {
         Commands::Branch {} => commands::branch::handle_branch(),
         Commands::Commit { args } => commands::commit::handle_commit(args),
+        Commands::Status { args } => commands::status::handle_status(args),
+        Commands::Add { args } => commands::add::handle_add(args),
     };
 
     if let Err(e) = result {
