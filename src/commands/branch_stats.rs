@@ -40,7 +40,7 @@ pub fn show_branch_stats() -> Result<(), Box<dyn std::error::Error>> {
         );
 
         // Get remote tracking info
-        if let Ok(remote_info) = get_remote_tracking_info(&branch) {
+        if let Ok(remote_info) = repo.get_remote_tracking_info(&branch) {
             println!("  {} {}", style("📡").blue(), style(remote_info).cyan());
         } else {
             println!(
@@ -51,7 +51,7 @@ pub fn show_branch_stats() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Get branch status (ahead/behind)
-        if let Ok(status) = get_branch_status(&branch)
+        if let Ok(status) = get_branch_status(&repo, &branch)
             && !status.is_empty()
         {
             println!("  {} {}", style("⚡").yellow(), style(status).yellow());
@@ -63,25 +63,9 @@ pub fn show_branch_stats() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn get_remote_tracking_info(branch: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let output = Command::new("git")
-        .args([
-            "rev-parse",
-            "--abbrev-ref",
-            &format!("{branch}@{{upstream}}"),
-        ])
-        .output()?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        Err("No remote tracking branch".into())
-    }
-}
-
-fn get_branch_status(branch: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn get_branch_status(repo: &GitRepo, branch: &str) -> Result<String, Box<dyn std::error::Error>> {
     // Check if we have a remote tracking branch first
-    if get_remote_tracking_info(branch).is_err() {
+    if repo.get_remote_tracking_info(branch).is_err() {
         return Ok(String::new());
     }
 
