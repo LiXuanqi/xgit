@@ -16,12 +16,64 @@ async fn main() {
     let result = match &cli.command {
         Commands::Branch {} => commands::branch::handle_branch(),
         Commands::Commit { args } => commands::commit::handle_commit(args),
-        Commands::Status { args } => commands::status::handle_status(args),
-        Commands::Add { args } => commands::add::handle_add(args),
+        Commands::External(args) => handle_external_command(args),
     };
 
     if let Err(e) = result {
         eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
+}
+
+fn handle_external_command(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+    if args.is_empty() {
+        eprintln!("No command provided");
+        std::process::exit(1);
+    }
+
+    let subcommand = &args[0];
+    let remaining_args = &args[1..];
+
+    // Allowlist of git commands that are safe to passthrough
+    const ALLOWED_COMMANDS: &[&str] = &[
+        "add",
+        "status",
+        "log",
+        "diff",
+        "show",
+        "remote",
+        "fetch",
+        "pull",
+        "push",
+        "checkout",
+        "switch",
+        "merge",
+        "rebase",
+        "reset",
+        "clean",
+        "stash",
+        "tag",
+        "blame",
+        "grep",
+        "ls-files",
+        "describe",
+        "reflog",
+        "cherry-pick",
+        "revert",
+        "bisect",
+        "submodule",
+        "worktree",
+        "config",
+        "help",
+        "version",
+    ];
+
+    if ALLOWED_COMMANDS.contains(&subcommand.as_str()) {
+        commands::git_passthrough::git_passthrough(subcommand, remaining_args)
+    } else {
+        eprintln!(
+            "Command '{subcommand}' is not allowed. Use 'git {subcommand}' directly if needed."
+        );
         std::process::exit(1);
     }
 }
