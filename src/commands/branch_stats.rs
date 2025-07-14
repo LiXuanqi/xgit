@@ -43,11 +43,28 @@ pub fn show_branch_stats() -> Result<(), Box<dyn std::error::Error>> {
         if let Ok(remote_info) = repo.get_remote_tracking_info(&branch) {
             println!("  {} {}", style("📡").blue(), style(remote_info).cyan());
         } else {
-            println!(
-                "  {} {}",
-                style("📡").blue(),
-                style("No remote tracking").yellow()
-            );
+            // Check if branch is merged into main when no remote tracking
+            if let Ok(is_merged) = repo.is_branch_merged_into_main(&branch) {
+                if is_merged {
+                    println!(
+                        "  {} {}",
+                        style("📡").blue(),
+                        style("No remote tracking (merged into main)").green()
+                    );
+                } else {
+                    println!(
+                        "  {} {}",
+                        style("📡").blue(),
+                        style("No remote tracking").yellow()
+                    );
+                }
+            } else {
+                println!(
+                    "  {} {}",
+                    style("📡").blue(),
+                    style("No remote tracking").yellow()
+                );
+            }
         }
 
         // Get branch status (ahead/behind)
