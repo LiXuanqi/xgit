@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Error};
@@ -248,7 +250,7 @@ impl GitRepo {
         Ok(())
     }
 
-    fn create_signature(&self) -> Result<Signature, Error> {
+    fn create_signature(&self) -> Result<Signature<'_>, Error> {
         let config = self
             .repo
             .config()
@@ -403,7 +405,7 @@ impl GitRepo {
     }
 
     /// Get diff object of staged changes
-    pub fn get_staged_diff(&self) -> Result<git2::Diff, Error> {
+    pub fn get_staged_diff(&self) -> Result<git2::Diff<'_>, Error> {
         let index = self
             .repo
             .index()

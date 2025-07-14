@@ -25,7 +25,7 @@ impl GitRepoTestDecorator {
 
         // Read existing content
         let mut existing_content = std::fs::read_to_string(&file_path)
-            .context(format!("Failed to read existing file '{}'", filename))?;
+            .context(format!("Failed to read existing file '{filename}'"))?;
 
         // Add newline if file doesn't end with one
         if !existing_content.is_empty() && !existing_content.ends_with('\n') {
@@ -37,7 +37,7 @@ impl GitRepoTestDecorator {
 
         // Write back to file
         std::fs::write(&file_path, existing_content)
-            .context(format!("Failed to write to file '{}'", filename))?;
+            .context(format!("Failed to write to file '{filename}'"))?;
 
         Ok(self)
     }
@@ -111,20 +111,19 @@ impl GitRepoTestDecorator {
             Ok(actual_target) => {
                 if actual_target != expected_target {
                     panic!(
-                        "HEAD symbolic target mismatch. Expected: '{}', Found: '{}'",
-                        expected_target, actual_target
+                        "HEAD symbolic target mismatch. Expected: '{expected_target}', Found: '{actual_target}'"
                     );
                 }
             }
             Err(e) => {
-                panic!("Failed to get HEAD symbolic target: {}", e);
+                panic!("Failed to get HEAD symbolic target: {e}");
             }
         }
         self
     }
 
     pub fn assert_current_branch(&self, branch_name: &str) -> &Self {
-        let expected_target = format!("refs/heads/{}", branch_name);
+        let expected_target = format!("refs/heads/{branch_name}");
         self.assert_head_symbolic_target(&expected_target);
 
         self
@@ -134,10 +133,7 @@ impl GitRepoTestDecorator {
     pub fn assert_file_exists(&self, filename: &str) -> &Self {
         let file_path = self.inner.path().join(filename);
         if !file_path.exists() {
-            panic!(
-                "Expected file '{}' to exist at path: {:?}",
-                filename, file_path
-            );
+            panic!("Expected file '{filename}' to exist at path: {file_path:?}");
         }
         self
     }
@@ -146,10 +142,7 @@ impl GitRepoTestDecorator {
     pub fn assert_file_not_exists(&self, filename: &str) -> &Self {
         let file_path = self.inner.path().join(filename);
         if file_path.exists() {
-            panic!(
-                "Expected file '{}' to not exist at path: {:?}",
-                filename, file_path
-            );
+            panic!("Expected file '{filename}' to not exist at path: {file_path:?}");
         }
         self
     }
