@@ -1,5 +1,5 @@
 use super::git_passthrough::git_passthrough;
-use crate::{ai, git_repo::GitRepo};
+use crate::{ai, git::GitRepo};
 use console::style;
 use std::fs;
 use std::process::Command;

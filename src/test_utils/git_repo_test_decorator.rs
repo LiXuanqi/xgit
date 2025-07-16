@@ -1,4 +1,4 @@
-use crate::git_repo::GitRepo;
+use crate::git::GitRepo;
 use anyhow::{Context, Error};
 use std::ops::Deref;
 use std::result::Result::Ok;
@@ -159,7 +159,7 @@ impl Deref for GitRepoTestDecorator {
 #[cfg(test)]
 mod tests {
 
-    use crate::{git_repo::GitRepo, test_utils::GitRepoTestDecorator};
+    use crate::{git::GitRepo, test_utils::GitRepoTestDecorator};
 
     #[test]
     fn assert_commit_messages_works_correctly() {

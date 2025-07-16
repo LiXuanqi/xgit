@@ -1,6 +1,6 @@
 use super::branch_prune::prune_merged_branches;
 use super::branch_stats::show_branch_stats;
-use crate::git_repo::GitRepo;
+use crate::git::GitRepo;
 use console::style;
 use inquire::Select;
 

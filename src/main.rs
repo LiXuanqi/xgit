@@ -1,7 +1,9 @@
+#![allow(dead_code)]
+
 mod ai;
 mod cli;
 mod commands;
-mod git_repo;
+mod git;
 
 #[cfg(test)]
 mod test_utils;

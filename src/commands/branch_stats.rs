@@ -1,4 +1,4 @@
-use crate::git_repo::GitRepo;
+use crate::git::GitRepo;
 use console::style;
 use std::process::Command;
 
