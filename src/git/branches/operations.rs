@@ -93,6 +93,29 @@ impl GitRepo {
 
         Ok(branch_name.to_string())
     }
+
+    /// Check if a specific branch is merged to main
+    pub fn is_branch_merged_to_main(&self, branch_name: &str) -> Result<bool, Error> {
+        let branch_ref = self
+            .repo()
+            .find_reference(&format!("refs/heads/{branch_name}"))
+            .context("Failed to find branch reference")?;
+        let branch_oid = branch_ref.target().context("Failed to get branch target")?;
+
+        let main_ref = self
+            .repo()
+            .find_reference("refs/heads/main")
+            .or_else(|_| self.repo().find_reference("refs/heads/master"))
+            .context("Failed to find main/master branch")?;
+        let main_oid = main_ref.target().context("Failed to get main target")?;
+
+        let merge_base = self
+            .repo()
+            .merge_base(branch_oid, main_oid)
+            .context("Failed to find merge base")?;
+
+        Ok(merge_base == branch_oid)
+    }
 }
 
 #[cfg(test)]
@@ -205,5 +228,31 @@ mod tests {
 
         let current_branch = repo.get_current_branch().unwrap();
         assert_eq!(current_branch, "master");
+    }
+
+    #[test]
+    fn is_branch_merged_to_main_works() {
+        let temp_dir = assert_fs::TempDir::new().unwrap();
+        let path = temp_dir.path();
+        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+
+        // Create initial commit on master
+        repo.add_file_and_commit("README.md", "initial", "Initial commit")
+            .unwrap();
+
+        // Create feature branch
+        repo.create_and_checkout_branch("feature-branch").unwrap();
+        repo.add_file_and_commit("feature.txt", "feature content", "Feature commit")
+            .unwrap();
+
+        // Feature branch should not be merged to master yet
+        assert!(!repo.is_branch_merged_to_main("feature-branch").unwrap());
+
+        // Switch back to master and merge feature branch
+        repo.checkout_branch("master").unwrap();
+        repo.merge("feature-branch", None).unwrap();
+
+        // Now feature branch should be merged to master
+        assert!(repo.is_branch_merged_to_main("feature-branch").unwrap());
     }
 }
