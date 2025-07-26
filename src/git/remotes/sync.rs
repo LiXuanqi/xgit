@@ -236,7 +236,10 @@ impl GitRepo {
 
 #[cfg(test)]
 mod tests {
-    use crate::{git::GitRepo, test_utils::GitRepoTestDecorator};
+    use crate::{
+        git::GitRepo,
+        test_utils::{RepoAssertions, RepoTestOperations},
+    };
 
     #[test]
     fn fetch_works() {
@@ -244,10 +247,10 @@ mod tests {
         let remote_dir = assert_fs::TempDir::new().unwrap();
 
         // Setup remote repository with initial commit
-        let remote_repo = GitRepoTestDecorator::new(GitRepo::init_bare(remote_dir.path()).unwrap());
+        let remote_repo = GitRepo::init_bare(remote_dir.path()).unwrap();
 
         // Setup local repository
-        let local_repo = GitRepoTestDecorator::new(GitRepo::init(local_dir.path()).unwrap());
+        let local_repo = GitRepo::init(local_dir.path()).unwrap();
         local_repo
             .add_file_and_commit("README.md", "initial", "Initial commit")
             .unwrap();
@@ -287,10 +290,10 @@ mod tests {
         let remote_dir = assert_fs::TempDir::new().unwrap();
 
         // Setup remote repository
-        let remote_repo = GitRepoTestDecorator::new(GitRepo::init_bare(remote_dir.path()).unwrap());
+        let remote_repo = GitRepo::init_bare(remote_dir.path()).unwrap();
 
         // Setup local repository
-        let local_repo = GitRepoTestDecorator::new(GitRepo::init(local_dir.path()).unwrap());
+        let local_repo = GitRepo::init(local_dir.path()).unwrap();
         local_repo
             .add_file_and_commit("README.md", "initial", "Initial commit")
             .unwrap();

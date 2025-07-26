@@ -104,7 +104,7 @@ impl GitRepo {
 mod tests {
     use git2::Repository;
 
-    use crate::{git::GitRepo, test_utils::GitRepoTestDecorator};
+    use crate::{git::GitRepo, test_utils::RepoAssertions};
 
     #[test]
     fn open_works() {
@@ -129,7 +129,7 @@ mod tests {
     fn init_works() {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let repo = GitRepo::init(path).unwrap();
 
         assert_eq!(repo.path(), temp_dir.path());
 
@@ -154,7 +154,7 @@ mod tests {
     fn init_bare_works() {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init_bare(path).unwrap());
+        let repo = GitRepo::init_bare(path).unwrap();
 
         assert_eq!(repo.path(), temp_dir.path());
 

@@ -102,14 +102,14 @@ impl GitRepo {
 mod tests {
     use crate::{
         git::{GitRepo, repository::core::RemoteInfo},
-        test_utils::GitRepoTestDecorator,
+        test_utils::RepoTestOperations,
     };
 
     #[test]
     fn add_remote_works() {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let repo = GitRepo::init(path).unwrap();
 
         let remotes = repo.get_remotes().unwrap();
         assert_eq!(remotes.len(), 0);
@@ -130,7 +130,7 @@ mod tests {
     fn set_remote_url_works() {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let repo = GitRepo::init(path).unwrap();
 
         let remotes = repo.get_remotes().unwrap();
         assert_eq!(remotes.len(), 0);
@@ -162,7 +162,7 @@ mod tests {
     fn get_remotes_works() {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let repo = GitRepo::init(path).unwrap();
 
         let remotes = repo.get_remotes().unwrap();
         assert_eq!(remotes.len(), 0);
@@ -190,7 +190,7 @@ mod tests {
     fn get_remote_names_works() {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let repo = GitRepo::init(path).unwrap();
 
         let remote_names = repo.get_remote_names().unwrap();
         assert_eq!(remote_names.len(), 0);
@@ -208,14 +208,14 @@ mod tests {
         let remote_dir = assert_fs::TempDir::new().unwrap();
 
         // Setup remote repository
-        let remote_repo = GitRepoTestDecorator::new(GitRepo::init_bare(remote_dir.path()).unwrap());
+        let remote_repo = GitRepo::init_bare(remote_dir.path()).unwrap();
 
         // Verify remote is empty
         let remote_branches = remote_repo.get_all_branches().unwrap();
         assert_eq!(remote_branches.len(), 0);
 
         // Setup local repository
-        let local_repo = GitRepoTestDecorator::new(GitRepo::init(local_dir.path()).unwrap());
+        let local_repo = GitRepo::init(local_dir.path()).unwrap();
         local_repo
             .add_file_and_commit("test.txt", "content", "Initial commit")
             .unwrap();
@@ -237,10 +237,10 @@ mod tests {
         let remote_dir = assert_fs::TempDir::new().unwrap();
 
         // Setup remote repository
-        let remote_repo = GitRepoTestDecorator::new(GitRepo::init_bare(remote_dir.path()).unwrap());
+        let remote_repo = GitRepo::init_bare(remote_dir.path()).unwrap();
 
         // Setup local repository
-        let local_repo = GitRepoTestDecorator::new(GitRepo::init(local_dir.path()).unwrap());
+        let local_repo = GitRepo::init(local_dir.path()).unwrap();
         local_repo
             .add_file_and_commit("test.txt", "content", "Initial commit")
             .unwrap();
@@ -270,10 +270,10 @@ mod tests {
         let remote_dir = assert_fs::TempDir::new().unwrap();
 
         // Setup remote repository
-        let remote_repo = GitRepoTestDecorator::new(GitRepo::init_bare(remote_dir.path()).unwrap());
+        let remote_repo = GitRepo::init_bare(remote_dir.path()).unwrap();
 
         // Setup local repository
-        let local_repo = GitRepoTestDecorator::new(GitRepo::init(local_dir.path()).unwrap());
+        let local_repo = GitRepo::init(local_dir.path()).unwrap();
         local_repo
             .add_file_and_commit("test.txt", "content", "Initial commit")
             .unwrap();

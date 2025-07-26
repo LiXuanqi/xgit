@@ -120,13 +120,16 @@ impl GitRepo {
 
 #[cfg(test)]
 mod tests {
-    use crate::{git::GitRepo, test_utils::GitRepoTestDecorator};
+    use crate::{
+        git::GitRepo,
+        test_utils::{RepoAssertions, RepoTestOperations},
+    };
 
     #[test]
     fn create_branch_and_get_all_branches_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let repo = GitRepo::init(path).unwrap();
 
         let branch_1 = "foo_branch";
         let branch_2 = "bar_branch";
@@ -151,7 +154,7 @@ mod tests {
     fn create_branch_works_when_no_commit() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let repo = GitRepo::init(path).unwrap();
 
         let branch = "bar_branch";
         repo.create_and_checkout_branch(branch)?
@@ -172,7 +175,7 @@ mod tests {
     fn checkout_branch_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let repo = GitRepo::init(path).unwrap();
 
         repo.add_file_and_commit("test_file_1.txt", "foo", "Test commit 1")?
             .create_and_checkout_branch("feature-branch")?
@@ -192,7 +195,7 @@ mod tests {
     fn get_current_branch_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let repo = GitRepo::init(path).unwrap();
 
         // Add initial commit so branches work properly
         repo.add_file_and_commit("README.md", "initial", "Initial commit")?;
@@ -219,7 +222,7 @@ mod tests {
     fn is_branch_merged_to_main_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let repo = GitRepo::init(path).unwrap();
 
         // Create initial commit on master
         repo.add_file_and_commit("README.md", "initial", "Initial commit")?

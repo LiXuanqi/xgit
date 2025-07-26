@@ -165,12 +165,15 @@ impl GitRepo {
 
 #[cfg(test)]
 mod tests {
-    use crate::{git::GitRepo, test_utils::GitRepoTestDecorator};
+    use crate::{
+        git::GitRepo,
+        test_utils::{RepoAssertions, RepoTestOperations},
+    };
 
     #[test]
     fn merge_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(temp_dir.path()).unwrap());
+        let repo = GitRepo::init(temp_dir.path()).unwrap();
 
         // Add initial commit to master
         repo.add_file_and_commit("README.md", "initial", "Initial commit")?
@@ -178,20 +181,19 @@ mod tests {
             .add_file_and_commit("feature.txt", "feature content", "Add feature")?
             .checkout_branch("master")?;
 
-        // Merge the feature branch using deref
-        let git_repo: &GitRepo = &repo;
-        let result = git_repo.merge("feature", None).unwrap();
+        // Merge the feature branch
+        let result = repo.merge("feature", None).unwrap();
         assert!(result.contains("Fast-forward merge") || result.contains("Merge commit created"));
 
         // Verify the feature file exists on master after merge
         repo.assert_file_exists("feature.txt");
 
         // Test merging already merged branch
-        let result = git_repo.merge("feature", None).unwrap();
+        let result = repo.merge("feature", None).unwrap();
         assert_eq!(result, "Already up-to-date");
 
         // Test merging non-existent branch
-        let result = git_repo.merge("nonexistent", None);
+        let result = repo.merge("nonexistent", None);
         assert!(result.is_err());
         Ok(())
     }
