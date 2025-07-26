@@ -4,9 +4,13 @@ use crate::git::GitRepo;
 use console::style;
 use inquire::Select;
 
-pub fn handle_branch(prune_merged: bool, stats: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn handle_branch(
+    prune_merged: bool,
+    stats: bool,
+    dry_run: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     if prune_merged {
-        return prune_merged_branches();
+        return prune_merged_branches(dry_run);
     }
 
     if stats {

@@ -19,6 +19,9 @@ pub enum Commands {
         /// Show current branch and associated GitHub PR information
         #[arg(long)]
         stats: bool,
+        /// Show what would be pruned without actually deleting branches
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Create a commit (passthrough to git commit)
     Commit {

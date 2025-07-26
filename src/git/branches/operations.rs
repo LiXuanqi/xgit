@@ -116,6 +116,22 @@ impl GitRepo {
 
         Ok(merge_base == branch_oid)
     }
+
+    /// Delete a local branch
+    pub fn delete_branch(&self, branch_name: &str) -> Result<(), Error> {
+        use anyhow::Context;
+
+        let mut branch = self
+            .repo()
+            .find_branch(branch_name, git2::BranchType::Local)
+            .context(format!("Failed to find branch '{branch_name}'"))?;
+
+        branch
+            .delete()
+            .context(format!("Failed to delete branch '{branch_name}'"))?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

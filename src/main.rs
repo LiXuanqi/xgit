@@ -21,7 +21,8 @@ async fn main() {
         Commands::Branch {
             prune_merged,
             stats,
-        } => commands::branch::handle_branch(*prune_merged, *stats),
+            dry_run,
+        } => commands::branch::handle_branch(*prune_merged, *stats, *dry_run),
         Commands::Commit { args } => commands::commit::handle_commit(args),
         Commands::External(args) => handle_external_command(args),
     };
