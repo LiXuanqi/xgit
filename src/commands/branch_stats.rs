@@ -1,6 +1,5 @@
 use crate::git::GitRepo;
 use console::style;
-use std::process::Command;
 
 /// Show statistics for all local branches
 pub fn show_branch_stats() -> Result<(), Box<dyn std::error::Error>> {
@@ -65,47 +64,8 @@ pub fn show_branch_stats() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
 
-        // Get branch status (ahead/behind)
-        if let Ok(status) = get_branch_status(&repo, &branch)
-            && !status.is_empty()
-        {
-            println!("  {} {}", style("⚡").yellow(), style(status).yellow());
-        }
-
         println!(); // Empty line between branches
     }
 
     Ok(())
-}
-
-fn get_branch_status(repo: &GitRepo, branch: &str) -> Result<String, Box<dyn std::error::Error>> {
-    // Check if we have a remote tracking branch first
-    if repo.get_remote_tracking_info(branch).is_err() {
-        return Ok(String::new());
-    }
-
-    let output = Command::new("git")
-        .args(["status", "--porcelain=v1", "--branch"])
-        .output()?;
-
-    if output.status.success() {
-        let status_output = String::from_utf8_lossy(&output.stdout);
-
-        // Parse the first line which contains branch info
-        if let Some(first_line) = status_output.lines().next()
-            && let Some(branch_info) = first_line.strip_prefix("## ")
-        {
-            // Look for ahead/behind information
-            if branch_info.contains("ahead") || branch_info.contains("behind") {
-                // Extract just the ahead/behind part
-                if let Some(bracket_start) = branch_info.find('[')
-                    && let Some(bracket_end) = branch_info.find(']')
-                {
-                    return Ok(branch_info[bracket_start + 1..bracket_end].to_string());
-                }
-            }
-        }
-    }
-
-    Ok(String::new())
 }
