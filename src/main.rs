@@ -4,6 +4,7 @@ mod ai;
 mod cli;
 mod commands;
 mod git;
+mod tui;
 
 #[cfg(test)]
 mod test_utils;

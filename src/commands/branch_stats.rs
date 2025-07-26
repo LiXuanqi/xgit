@@ -1,71 +1,42 @@
-use crate::git::GitRepo;
-use console::style;
+use crate::{
+    git::GitRepo,
+    tui::branch_display::{self, BranchInfo, MergeStatus},
+};
 
 /// Show statistics for all local branches
 pub fn show_branch_stats() -> Result<(), Box<dyn std::error::Error>> {
-    println!("{} Branch Statistics", style("📊").cyan().bold());
-    println!();
-
-    // Open git repository and get all branches
     let repo = GitRepo::open(".")?;
+    let branch_infos = gather_branch_data(&repo)?;
+    branch_display::display_branch_stats(&branch_infos);
+    Ok(())
+}
+
+/// Gather all branch data from the git repository
+fn gather_branch_data(repo: &GitRepo) -> Result<Vec<BranchInfo>, Box<dyn std::error::Error>> {
     let branches = repo.get_all_branches()?;
     let current_branch = repo.get_current_branch()?;
 
-    if branches.is_empty() {
-        println!("{} No branches found", style("⚠").yellow());
-        return Ok(());
-    }
+    let mut branch_infos = Vec::new();
 
     for branch in branches {
-        // Mark current branch
-        let branch_marker = if branch == current_branch {
-            style("● ").green().bold()
-        } else {
-            style("  ").dim()
+        let branch_info = BranchInfo {
+            name: branch.clone(),
+            is_current: branch == current_branch,
+            commit_info: repo.get_branch_commit_info(&branch).ok(),
+            merge_status: get_merge_status(repo, &branch),
+            remote_tracking: repo.get_remote_tracking_info(&branch).ok(),
         };
-
-        println!("{}{}", branch_marker, style(&branch).cyan().bold());
-
-        // Get branch commit info
-        if let Ok(commit_info) = repo.get_branch_commit_info(&branch) {
-            println!("  {} {}", style("📝").blue(), style(commit_info).dim());
-        }
-
-        // Show merge status to main
-        match repo.is_branch_merged_to_main(&branch) {
-            Ok(true) => println!(
-                "  {} {}",
-                style("✅").green(),
-                style("Merged to main").green()
-            ),
-            Ok(false) => println!(
-                "  {} {}",
-                style("🔄").yellow(),
-                style("Not merged to main").yellow()
-            ),
-            Err(_) => {} // Skip if we can't determine merge status
-        }
-
-        // TODO: Add GitHub PR lookup back when async is resolved
-        println!(
-            "  {} {}",
-            style("🔗").yellow(),
-            style("GitHub PR lookup: TODO").dim()
-        );
-
-        // Get remote tracking info
-        if let Ok(remote_info) = repo.get_remote_tracking_info(&branch) {
-            println!("  {} {}", style("📡").blue(), style(remote_info).cyan());
-        } else {
-            println!(
-                "  {} {}",
-                style("📡").blue(),
-                style("No remote tracking").yellow()
-            );
-        }
-
-        println!(); // Empty line between branches
+        branch_infos.push(branch_info);
     }
 
-    Ok(())
+    Ok(branch_infos)
+}
+
+/// Determine the merge status of a branch
+fn get_merge_status(repo: &GitRepo, branch: &str) -> MergeStatus {
+    match repo.is_branch_merged_to_main(branch) {
+        Ok(true) => MergeStatus::Merged,
+        Ok(false) => MergeStatus::NotMerged,
+        Err(_) => MergeStatus::Unknown,
+    }
 }
