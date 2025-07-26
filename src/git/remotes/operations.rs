@@ -54,6 +54,20 @@ impl GitRepo {
         Ok(remotes.into_iter().map(|r| r.name).collect())
     }
 
+    /// Get the URL of a specific remote
+    pub fn get_remote_url(&self, name: &str) -> Result<String, Error> {
+        let remote = self
+            .repo()
+            .find_remote(name)
+            .context(format!("Failed to find remote '{name}'"))?;
+
+        let url = remote
+            .url()
+            .ok_or_else(|| anyhow::anyhow!("Remote '{name}' has no URL"))?;
+
+        Ok(url.to_string())
+    }
+
     /// Push current branch to remote (equivalent to `git push <remote> <branch>`)
     ///
     /// # Arguments

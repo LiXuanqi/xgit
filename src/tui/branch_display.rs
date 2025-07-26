@@ -1,4 +1,5 @@
 use console::style;
+use serde::{Deserialize, Serialize};
 
 /// Information about a single branch
 #[derive(Debug)]
@@ -8,6 +9,7 @@ pub struct BranchInfo {
     pub commit_info: Option<String>,
     pub merge_status: MergeStatus,
     pub remote_tracking: Option<String>,
+    pub pull_request: Option<PullRequestInfo>,
 }
 
 /// Merge status of a branch relative to main
@@ -16,6 +18,23 @@ pub enum MergeStatus {
     Merged,
     NotMerged,
     Unknown,
+}
+
+/// Information about a GitHub pull request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PullRequestInfo {
+    pub number: u64,
+    pub title: String,
+    pub state: PullRequestState,
+    pub url: String,
+    pub draft: bool,
+}
+
+/// State of a GitHub pull request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PullRequestState {
+    Open,
+    Closed,
 }
 
 /// Display branch statistics in a formatted way
@@ -52,12 +71,8 @@ fn display_single_branch(branch: &BranchInfo) {
     // Show merge status to main
     display_merge_status(&branch.merge_status);
 
-    // TODO: Add GitHub PR lookup back when async is resolved
-    println!(
-        "  {} {}",
-        style("🔗").yellow(),
-        style("GitHub PR lookup: TODO").dim()
-    );
+    // Display GitHub PR information
+    display_pull_request_info(&branch.pull_request);
 
     // Display remote tracking info
     display_remote_tracking_info(&branch.remote_tracking);
@@ -79,6 +94,36 @@ fn display_merge_status(status: &MergeStatus) {
             style("Not merged to main").yellow()
         ),
         MergeStatus::Unknown => {} // Skip if we can't determine merge status
+    }
+}
+
+/// Display GitHub pull request information for a branch
+fn display_pull_request_info(pull_request: &Option<PullRequestInfo>) {
+    if let Some(pr) = pull_request {
+        let state_display = match pr.state {
+            PullRequestState::Open => {
+                if pr.draft {
+                    style("Draft").yellow()
+                } else {
+                    style("Open").green()
+                }
+            }
+            PullRequestState::Closed => style("Closed").red(),
+        };
+
+        println!(
+            "  {} {} {} {}",
+            style("🔗").yellow(),
+            style(format!("PR #{}", pr.number)).cyan().bold(),
+            state_display,
+            style(&pr.title).dim()
+        );
+    } else {
+        println!(
+            "  {} {}",
+            style("🔗").yellow(),
+            style("No GitHub PR found").dim()
+        );
     }
 }
 

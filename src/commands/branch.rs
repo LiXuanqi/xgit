@@ -4,7 +4,7 @@ use crate::git::GitRepo;
 use console::style;
 use inquire::Select;
 
-pub fn handle_branch(
+pub async fn handle_branch(
     prune_merged: bool,
     stats: bool,
     dry_run: bool,
@@ -14,7 +14,7 @@ pub fn handle_branch(
     }
 
     if stats {
-        return show_branch_stats();
+        return show_branch_stats().await;
     }
     let repo = GitRepo::open(".")?;
 
