@@ -227,9 +227,8 @@ mod tests {
         // Create initial commit on master
         repo.add_file_and_commit("README.md", "initial", "Initial commit")?
             // Create feature branch
-            .create_and_checkout_branch("feature-branch")?;
-
-        repo.add_file_and_commit("feature.txt", "feature content", "Feature commit")?;
+            .create_and_checkout_branch("feature-branch")?
+            .add_file_and_commit("feature.txt", "feature content", "Feature commit")?;
         // Feature branch should not be merged to master yet
         assert!(!repo.is_branch_merged_to_main("feature-branch").unwrap());
 

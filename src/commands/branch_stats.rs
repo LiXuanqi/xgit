@@ -32,6 +32,21 @@ pub fn show_branch_stats() -> Result<(), Box<dyn std::error::Error>> {
             println!("  {} {}", style("📝").blue(), style(commit_info).dim());
         }
 
+        // Show merge status to main
+        match repo.is_branch_merged_to_main(&branch) {
+            Ok(true) => println!(
+                "  {} {}",
+                style("✅").green(),
+                style("Merged to main").green()
+            ),
+            Ok(false) => println!(
+                "  {} {}",
+                style("🔄").yellow(),
+                style("Not merged to main").yellow()
+            ),
+            Err(_) => {} // Skip if we can't determine merge status
+        }
+
         // TODO: Add GitHub PR lookup back when async is resolved
         println!(
             "  {} {}",
@@ -43,28 +58,11 @@ pub fn show_branch_stats() -> Result<(), Box<dyn std::error::Error>> {
         if let Ok(remote_info) = repo.get_remote_tracking_info(&branch) {
             println!("  {} {}", style("📡").blue(), style(remote_info).cyan());
         } else {
-            // Check if branch is merged into main when no remote tracking
-            if let Ok(is_merged) = repo.is_branch_merged_into_main(&branch) {
-                if is_merged {
-                    println!(
-                        "  {} {}",
-                        style("📡").blue(),
-                        style("No remote tracking (merged into main)").green()
-                    );
-                } else {
-                    println!(
-                        "  {} {}",
-                        style("📡").blue(),
-                        style("No remote tracking").yellow()
-                    );
-                }
-            } else {
-                println!(
-                    "  {} {}",
-                    style("📡").blue(),
-                    style("No remote tracking").yellow()
-                );
-            }
+            println!(
+                "  {} {}",
+                style("📡").blue(),
+                style("No remote tracking").yellow()
+            );
         }
 
         // Get branch status (ahead/behind)
