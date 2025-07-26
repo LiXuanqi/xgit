@@ -235,80 +235,77 @@ mod tests {
     }
 
     #[test]
-    fn list_commits_works() {
+    fn list_commits_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
 
         let commits = repo.list_commits().unwrap();
-
         assert_eq!(commits.len(), 0);
 
-        repo.add_file_and_commit("test_file_1.txt", "foo", "Test commit 1")
-            .unwrap();
-        repo.add_file_and_commit("test_file_2.txt", "foo", "Test commit 2")
-            .unwrap();
-        repo.add_file_and_commit("test_file_3.txt", "foo", "Test commit 3")
-            .unwrap();
+        repo.add_file_and_commit("test_file_1.txt", "foo", "Test commit 1")?
+            .add_file_and_commit("test_file_2.txt", "foo", "Test commit 2")?
+            .add_file_and_commit("test_file_3.txt", "foo", "Test commit 3")?
+            .assert_commit_messages(&["Test commit 3", "Test commit 2", "Test commit 1"]);
 
         let commits = repo.list_commits().unwrap();
-
-        // TODO: assert content of CommitInfo
         assert_eq!(commits.len(), 3);
 
-        repo.assert_commit_messages(&["Test commit 3", "Test commit 2", "Test commit 1"]);
+        Ok(())
     }
 
     #[test]
-    fn add_works_for_single_file_path() {
+    fn add_works_for_single_file_path() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
-
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
 
         let file_name = "test_file.txt";
-        repo.add_file(file_name, "foo").unwrap();
+        repo.add_file(file_name, "foo")?.add(&[file_name])?;
 
-        repo.add(&[file_name]).unwrap();
         // Verify the file is staged
         let index = repo.repo().index().unwrap();
         let entry = index.get_path(std::path::Path::new(file_name), 0);
         assert!(entry.is_some(), "File should be in the index after adding");
+        Ok(())
     }
 
     #[test]
-    fn add_works_for_glob_patterns() {
+    fn add_works_for_glob_patterns() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
-        repo.add_file("test_file_1.txt", "foo").unwrap();
-        repo.add_file("test_file_2.txt", "foo").unwrap();
-        repo.add_file("test_file_non_text.rs", "foo").unwrap();
 
-        repo.add(&["*.txt"]).unwrap();
+        repo.add_file("test_file_1.txt", "foo")?
+            .add_file("test_file_2.txt", "foo")?
+            .add_file("test_file_non_text.rs", "foo")?
+            .add(&["*.txt"])?;
+
         // Verify the file is staged
         let index = repo.repo().index().unwrap();
         assert_eq!(index.len(), 2);
+        Ok(())
     }
 
     #[test]
-    fn add_works_for_all_files() {
+    fn add_works_for_all_files() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
 
-        repo.add_file("test_file_1.txt", "foo").unwrap();
-        repo.add_file("test_file_2.txt", "foo").unwrap();
-        repo.add_file("test_file_non_text.rs", "foo").unwrap();
+        repo.add_file("test_file_1.txt", "foo")?
+            .add_file("test_file_2.txt", "foo")?
+            .add_file("test_file_non_text.rs", "foo")?
+            .add(&["."])?;
 
-        repo.add(&["."]).unwrap();
         // Verify the file is staged
         let index = repo.repo().index().unwrap();
         assert_eq!(index.len(), 3);
+        Ok(())
     }
 
     #[test]
-    fn has_staged_changes_works() {
+    fn has_staged_changes_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
@@ -317,25 +314,26 @@ mod tests {
         assert!(!repo.has_staged_changes().unwrap());
 
         // Add a file without staging
-        repo.add_file("test.txt", "content").unwrap();
+        repo.add_file("test.txt", "content")?;
         assert!(!repo.has_staged_changes().unwrap());
 
         // Stage the file
-        repo.add(&["test.txt"]).unwrap();
+        repo.add(&["test.txt"])?;
         assert!(repo.has_staged_changes().unwrap());
 
         // Commit the file
-        repo.commit("Initial commit").unwrap();
+        repo.commit("Initial commit")?;
         assert!(!repo.has_staged_changes().unwrap());
 
         // Add another file and stage it
-        repo.add_file("test2.txt", "content2").unwrap();
-        repo.add(&["test2.txt"]).unwrap();
+        repo.add_file("test2.txt", "content2")?
+            .add(&["test2.txt"])?;
         assert!(repo.has_staged_changes().unwrap());
+        Ok(())
     }
 
     #[test]
-    fn diff_staged_works() {
+    fn diff_staged_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
@@ -345,38 +343,38 @@ mod tests {
         assert!(diff.is_empty());
 
         // Add and stage a file
-        repo.add_file("test.txt", "Hello World").unwrap();
-        repo.add(&["test.txt"]).unwrap();
+        repo.add_file("test.txt", "Hello World")?
+            .add(&["test.txt"])?;
 
         let diff = repo.diff_staged().unwrap();
         assert!(diff.contains("Hello World"));
         assert!(diff.contains("+Hello World"));
 
         // Commit the file
-        repo.commit("Add test file").unwrap();
+        repo.commit("Add test file")?;
 
         // No staged changes after commit
         let diff = repo.diff_staged().unwrap();
         assert!(diff.is_empty());
 
         // Modify and stage the file
-        repo.add_file("test.txt", "Hello World\nSecond line")
-            .unwrap();
-        repo.add(&["test.txt"]).unwrap();
+        repo.add_file("test.txt", "Hello World\nSecond line")?
+            .add(&["test.txt"])?;
 
         let diff = repo.diff_staged().unwrap();
         assert!(diff.contains("+Second line"));
+        Ok(())
     }
 
     #[test]
-    fn get_staged_diff_and_diff_to_string_work() {
+    fn get_staged_diff_and_diff_to_string_work() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
 
         // Add and stage a file
-        repo.add_file("test.txt", "Hello World").unwrap();
-        repo.add(&["test.txt"]).unwrap();
+        repo.add_file("test.txt", "Hello World")?
+            .add(&["test.txt"])?;
 
         // Test get_staged_diff returns a Diff object
         let diff_obj = repo.get_staged_diff().unwrap();
@@ -389,26 +387,25 @@ mod tests {
         // Should be same as calling diff_staged directly
         let direct_diff = repo.diff_staged().unwrap();
         assert_eq!(diff_string, direct_diff);
+        Ok(())
     }
 
     #[test]
-    fn get_branch_commit_info_works() {
+    fn get_branch_commit_info_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
 
         // Add initial commit
-        repo.add_file_and_commit("README.md", "initial", "Initial commit")
-            .unwrap();
+        repo.add_file_and_commit("README.md", "initial", "Initial commit")?;
 
         let commit_info = repo.get_branch_commit_info("master").unwrap();
         assert!(commit_info.contains("Initial commit"));
         assert!(commit_info.len() > 7); // Should have short hash + message
 
         // Test with feature branch
-        repo.create_and_checkout_branch("feature").unwrap();
-        repo.add_file_and_commit("feature.txt", "feature content", "Add feature")
-            .unwrap();
+        repo.create_and_checkout_branch("feature")?
+            .add_file_and_commit("feature.txt", "feature content", "Add feature")?;
 
         let feature_commit_info = repo.get_branch_commit_info("feature").unwrap();
         assert!(feature_commit_info.contains("Add feature"));
@@ -416,5 +413,6 @@ mod tests {
         // Test with non-existent branch
         let result = repo.get_branch_commit_info("nonexistent");
         assert!(result.is_err());
+        Ok(())
     }
 }

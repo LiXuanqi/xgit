@@ -25,7 +25,7 @@ pub fn handle_branch(prune_merged: bool, stats: bool) -> Result<(), Box<dyn std:
 
             match selection {
                 Ok(chosen_branch) => match repo.checkout_branch(&chosen_branch) {
-                    Ok(()) => {
+                    Ok(_) => {
                         println!(
                             "{} Switched to branch: {}",
                             style("✓").green().bold(),

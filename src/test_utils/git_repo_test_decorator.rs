@@ -146,6 +146,38 @@ impl GitRepoTestDecorator {
         }
         self
     }
+
+    // ===================== Fluent wrappers for branch operations ==================
+
+    /// Create and checkout branch (fluent wrapper)
+    pub fn create_and_checkout_branch(&self, branch_name: &str) -> Result<&Self, Error> {
+        self.inner.create_and_checkout_branch(branch_name)?;
+        Ok(self)
+    }
+
+    /// Checkout branch (fluent wrapper)
+    pub fn checkout_branch(&self, branch_name: &str) -> Result<&Self, Error> {
+        self.inner.checkout_branch(branch_name)?;
+        Ok(self)
+    }
+
+    /// Add files to staging (fluent wrapper)
+    pub fn add(&self, pathspecs: &[&str]) -> Result<&Self, Error> {
+        self.inner.add(pathspecs)?;
+        Ok(self)
+    }
+
+    /// Commit staged changes (fluent wrapper)
+    pub fn commit(&self, message: &str) -> Result<&Self, Error> {
+        self.inner.commit(message)?;
+        Ok(self)
+    }
+
+    /// Merge branch (fluent wrapper)
+    pub fn merge(&self, branch_name: &str, message: Option<&str>) -> Result<&Self, Error> {
+        self.inner.merge(branch_name, message)?;
+        Ok(self)
+    }
 }
 
 impl Deref for GitRepoTestDecorator {

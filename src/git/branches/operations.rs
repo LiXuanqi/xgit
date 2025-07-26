@@ -20,7 +20,7 @@ impl GitRepo {
     }
 
     /// Create a new branch from the current HEAD and switch to it
-    pub fn create_and_checkout_branch(&self, branch_name: &str) -> Result<(), Error> {
+    pub fn create_and_checkout_branch(&self, branch_name: &str) -> Result<&Self, Error> {
         match self.repo().head() {
             Ok(head) => {
                 // Repository has commits, create branch from HEAD
@@ -49,10 +49,10 @@ impl GitRepo {
             }
         }
 
-        Ok(())
+        Ok(self)
     }
 
-    pub fn checkout_branch(&self, branch_name: &str) -> Result<(), Error> {
+    pub fn checkout_branch(&self, branch_name: &str) -> Result<&Self, Error> {
         // Get the branch reference
         let branch_ref = format!("refs/heads/{branch_name}");
         let obj = self.repo().revparse_single(&branch_ref)?;
@@ -65,7 +65,7 @@ impl GitRepo {
         // Set HEAD to point to the branch
         self.repo().set_head(&branch_ref)?;
 
-        Ok(())
+        Ok(self)
     }
 
     pub fn get_head_symbolic_target(&self) -> Result<String, Error> {
@@ -123,21 +123,19 @@ mod tests {
     use crate::{git::GitRepo, test_utils::GitRepoTestDecorator};
 
     #[test]
-    fn create_branch_and_get_all_branches_works() {
+    fn create_branch_and_get_all_branches_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
-        repo.add_file_and_commit("test_file_1.txt", "foo", "Test commit 1")
-            .unwrap();
 
         let branch_1 = "foo_branch";
         let branch_2 = "bar_branch";
-        repo.create_and_checkout_branch(branch_1).unwrap();
 
-        repo.assert_current_branch(branch_1);
-        repo.create_and_checkout_branch(branch_2).unwrap();
-
-        repo.assert_current_branch(branch_2);
+        repo.add_file_and_commit("test_file_1.txt", "foo", "Test commit 1")?
+            .create_and_checkout_branch(branch_1)?
+            .assert_current_branch(branch_1)
+            .create_and_checkout_branch(branch_2)?
+            .assert_current_branch(branch_2);
 
         let mut actual = repo.get_all_branches().unwrap();
         let mut expected = vec!["master", branch_1, branch_2];
@@ -146,113 +144,98 @@ mod tests {
         expected.sort();
 
         assert_eq!(actual, expected);
+        Ok(())
     }
 
     #[test]
-    fn create_branch_works_when_no_commit() {
+    fn create_branch_works_when_no_commit() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
 
         let branch = "bar_branch";
-        repo.create_and_checkout_branch(branch).unwrap();
+        repo.create_and_checkout_branch(branch)?
+            .assert_current_branch(branch);
 
         let actual = repo.get_all_branches().unwrap();
         assert_eq!(actual.len(), 0);
 
-        // Check current branch changed
-        repo.assert_current_branch(branch);
-
         // After commit, branch should appear
-        repo.add_file_and_commit("test.txt", "content", "Initial commit")
-            .unwrap();
+        repo.add_file_and_commit("test.txt", "content", "Initial commit")?;
 
         let actual = repo.get_all_branches().unwrap();
         assert_eq!(actual, vec![branch]);
+        Ok(())
     }
 
     #[test]
-    fn checkout_branch_works() {
+    fn checkout_branch_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
 
-        repo.add_file_and_commit("test_file_1.txt", "foo", "Test commit 1")
-            .unwrap();
+        repo.add_file_and_commit("test_file_1.txt", "foo", "Test commit 1")?
+            .create_and_checkout_branch("feature-branch")?
+            .assert_current_branch("feature-branch")
+            .add_file_and_commit("feature.txt", "feature content", "Feature commit")?
+            .checkout_branch("master")?
+            .assert_current_branch("master")
+            .assert_file_not_exists("feature.txt")
+            .checkout_branch("feature-branch")?
+            .assert_current_branch("feature-branch")
+            .assert_file_exists("feature.txt");
 
-        // Create a feature branch
-        repo.create_and_checkout_branch("feature-branch").unwrap();
-        repo.assert_current_branch("feature-branch");
-
-        // Add a commit to feature branch
-        repo.add_file_and_commit("feature.txt", "feature content", "Feature commit")
-            .unwrap();
-
-        // Switch back to master
-        repo.checkout_branch("master").unwrap();
-        repo.assert_current_branch("master");
-
-        // Feature file should not exist on master
-        repo.assert_file_not_exists("feature.txt");
-
-        // Switch back to feature branch
-        repo.checkout_branch("feature-branch").unwrap();
-        repo.assert_current_branch("feature-branch");
-
-        // Feature file should exist on feature branch
-        repo.assert_file_exists("feature.txt");
+        Ok(())
     }
 
     #[test]
-    fn get_current_branch_works() {
+    fn get_current_branch_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
 
         // Add initial commit so branches work properly
-        repo.add_file_and_commit("README.md", "initial", "Initial commit")
-            .unwrap();
+        repo.add_file_and_commit("README.md", "initial", "Initial commit")?;
 
         // Initially on master
         let current_branch = repo.get_current_branch().unwrap();
         assert_eq!(current_branch, "master");
 
         // Create and switch to feature branch
-        repo.create_and_checkout_branch("feature-branch").unwrap();
+        repo.create_and_checkout_branch("feature-branch")?;
 
         let current_branch = repo.get_current_branch().unwrap();
         assert_eq!(current_branch, "feature-branch");
 
         // Switch back to master
-        repo.checkout_branch("master").unwrap();
+        repo.checkout_branch("master")?;
 
         let current_branch = repo.get_current_branch().unwrap();
         assert_eq!(current_branch, "master");
+        Ok(())
     }
 
     #[test]
-    fn is_branch_merged_to_main_works() {
+    fn is_branch_merged_to_main_works() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = assert_fs::TempDir::new().unwrap();
         let path = temp_dir.path();
         let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
 
         // Create initial commit on master
-        repo.add_file_and_commit("README.md", "initial", "Initial commit")
-            .unwrap();
+        repo.add_file_and_commit("README.md", "initial", "Initial commit")?
+            // Create feature branch
+            .create_and_checkout_branch("feature-branch")?;
 
-        // Create feature branch
-        repo.create_and_checkout_branch("feature-branch").unwrap();
-        repo.add_file_and_commit("feature.txt", "feature content", "Feature commit")
-            .unwrap();
-
+        repo.add_file_and_commit("feature.txt", "feature content", "Feature commit")?;
         // Feature branch should not be merged to master yet
         assert!(!repo.is_branch_merged_to_main("feature-branch").unwrap());
 
         // Switch back to master and merge feature branch
-        repo.checkout_branch("master").unwrap();
-        repo.merge("feature-branch", None).unwrap();
+        repo.checkout_branch("master")?
+            .merge("feature-branch", None)?;
 
         // Now feature branch should be merged to master
         assert!(repo.is_branch_merged_to_main("feature-branch").unwrap());
+        Ok(())
     }
 }
