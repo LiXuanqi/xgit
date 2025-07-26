@@ -1,5 +1,6 @@
 use crate::git::GitRepo;
 use console::style;
+use inquire::MultiSelect;
 
 /// Prune local branches that have been merged to main
 ///
@@ -108,22 +109,55 @@ fn show_dry_run_results(branches_to_prune: &[String]) {
     );
 }
 
-/// Actually prune the branches
+/// Actually prune the branches with interactive selection
 fn prune_branches(
     repo: &GitRepo,
     branches_to_prune: &[String],
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!(
-        "{} Deleting {} merged branches:",
+        "{} Found {} merged branches. Select which ones to delete:",
         style("🗑").red().bold(),
         branches_to_prune.len()
+    );
+    println!();
+
+    // Show branch details for context
+    for branch in branches_to_prune {
+        println!(
+            "  {} {} {}",
+            style("•").dim(),
+            style(branch).cyan().bold(),
+            style("(merged to main)").dim()
+        );
+    }
+    println!();
+
+    // Interactive selection
+    let branches_to_delete = MultiSelect::new(
+        "Select branches to delete:",
+        branches_to_prune.iter().map(|s| s.as_str()).collect(),
+    )
+    .prompt()?;
+
+    if branches_to_delete.is_empty() {
+        println!(
+            "{} No branches selected for deletion",
+            style("ℹ").blue().bold()
+        );
+        return Ok(());
+    }
+
+    println!(
+        "{} Deleting {} selected branches:",
+        style("🗑").red().bold(),
+        branches_to_delete.len()
     );
     println!();
 
     let mut deleted_count = 0;
     let mut failed_count = 0;
 
-    for branch in branches_to_prune {
+    for branch in branches_to_delete {
         match repo.delete_branch(branch) {
             Ok(()) => {
                 println!(
