@@ -17,6 +17,16 @@ An enhanced Git tool built with Rust that provides AI-powered commit messages, i
 cargo install xgit
 ```
 
+## Updating
+
+To update to the latest version:
+
+```bash
+cargo install xgit --force
+```
+
+**Note:** The `--force` flag is required to overwrite the existing installation.
+
 ## Usage
 
 ### Interactive Branch Switching
