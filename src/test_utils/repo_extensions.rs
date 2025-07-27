@@ -18,6 +18,8 @@ pub fn create_test_bare_repo() -> (assert_fs::TempDir, GitRepo) {
     let temp_dir = assert_fs::TempDir::new().unwrap();
     let path = temp_dir.path();
     let repo = GitRepo::init_bare(path).unwrap();
+    repo.set_user_config("Test User", "test@example.com")
+        .unwrap();
     (temp_dir, repo)
 }
 
