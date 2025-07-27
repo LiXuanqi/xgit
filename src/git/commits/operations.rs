@@ -223,14 +223,12 @@ impl GitRepo {
 mod tests {
     use crate::{
         git::GitRepo,
-        test_utils::{RepoAssertions, RepoTestOperations},
+        test_utils::{RepoAssertions, RepoTestOperations, create_test_repo},
     };
 
     #[test]
     fn list_commits_works_in_repo_without_any_commit() {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepo::init(path).unwrap();
+        let (_temp_dir, repo) = create_test_repo();
 
         let commits = repo.list_commits().unwrap();
 
@@ -239,9 +237,7 @@ mod tests {
 
     #[test]
     fn list_commits_works() -> Result<(), Box<dyn std::error::Error>> {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepo::init(path).unwrap();
+        let (_temp_dir, repo) = create_test_repo();
 
         let commits = repo.list_commits().unwrap();
         assert_eq!(commits.len(), 0);
