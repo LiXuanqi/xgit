@@ -33,12 +33,16 @@ cargo install xgit --force
 Select and switch between branches interactively:
 ```bash
 xgit branch
+# or use the short alias:
+xgit b
 ```
 
 ### Branch Statistics & GitHub PR Tracking
 View comprehensive branch information including GitHub PR status:
 ```bash
 xgit branch --stats
+# or use the short alias:
+xgit b --stats
 ```
 
 ### Smart Branch Pruning
@@ -47,9 +51,13 @@ Clean up branches that have been merged to main:
 ```bash
 # Preview what would be deleted (recommended first)
 xgit branch --prune-merged --dry-run
+# or use the short alias:
+xgit b --prune-merged --dry-run
 
 # Interactive deletion - select which branches to remove
 xgit branch --prune-merged
+# or use the short alias:
+xgit b --prune-merged
 ```
 
 ### AI-Powered Commits
@@ -60,6 +68,8 @@ git add .
 
 # Use AI to generate commit message
 xgit commit
+# or use the short alias:
+xgit c
 ```
 
 ### Git Passthrough

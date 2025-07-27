@@ -11,7 +11,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Branch operations
+    /// Branch operations (alias: b)
     #[command(alias = "b")]
     Branch {
         /// Clean up local branches that have been merged and deleted remotely
@@ -24,7 +24,7 @@ pub enum Commands {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Create a commit (passthrough to git commit)
+    /// Create a commit (passthrough to git commit) (alias: c)
     #[command(alias = "c")]
     Commit {
         /// Arguments to pass to git commit
