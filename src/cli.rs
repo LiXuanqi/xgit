@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "gitx")]
+#[command(name = "xgit")]
 #[command(about = "A Git extension tool")]
 #[command(allow_external_subcommands = true)]
 pub struct Cli {
@@ -12,6 +12,7 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// Branch operations
+    #[command(alias = "b")]
     Branch {
         /// Clean up local branches that have been merged and deleted remotely
         #[arg(long)]
@@ -24,6 +25,7 @@ pub enum Commands {
         dry_run: bool,
     },
     /// Create a commit (passthrough to git commit)
+    #[command(alias = "c")]
     Commit {
         /// Arguments to pass to git commit
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
