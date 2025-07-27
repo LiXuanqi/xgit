@@ -191,13 +191,15 @@ impl Deref for GitRepoTestDecorator {
 #[cfg(test)]
 mod tests {
 
-    use crate::{git::GitRepo, test_utils::GitRepoTestDecorator};
+    use crate::{
+        git::GitRepo,
+        test_utils::{GitRepoTestDecorator, create_test_repo},
+    };
 
     #[test]
     fn assert_commit_messages_works_correctly() {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let (_temp_dir, repo_inner) = create_test_repo();
+        let repo = GitRepoTestDecorator::new(repo_inner);
 
         repo.assert_commit_messages(&[]);
 
@@ -238,9 +240,8 @@ mod tests {
 
     #[test]
     fn append_to_file_works() {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let (_temp_dir, repo_inner) = create_test_repo();
+        let repo = GitRepoTestDecorator::new(repo_inner);
 
         let filename = "test.txt";
 
@@ -252,16 +253,15 @@ mod tests {
         repo.append_to_file(filename, "line3").unwrap();
 
         // Read file and verify content
-        let file_path = path.join(filename);
+        let file_path = repo.path().join(filename);
         let content = std::fs::read_to_string(file_path).unwrap();
         assert_eq!(content, "line1\nline2\nline3");
     }
 
     #[test]
     fn append_to_nonexistent_file_fails() {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let (_temp_dir, repo_inner) = create_test_repo();
+        let repo = GitRepoTestDecorator::new(repo_inner);
 
         // Try to append to non-existent file
         let result = repo.append_to_file("nonexistent.txt", "content");
@@ -270,9 +270,8 @@ mod tests {
 
     #[test]
     fn append_to_file_and_commit_works() {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepoTestDecorator::new(GitRepo::init(path).unwrap());
+        let (_temp_dir, repo_inner) = create_test_repo();
+        let repo = GitRepoTestDecorator::new(repo_inner);
 
         let filename = "changelog.txt";
 
@@ -291,7 +290,7 @@ mod tests {
         .unwrap();
 
         // Verify file content
-        let file_path = path.join(filename);
+        let file_path = repo.path().join(filename);
         let content = std::fs::read_to_string(file_path).unwrap();
         assert_eq!(
             content,

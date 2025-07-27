@@ -165,15 +165,11 @@ impl GitRepo {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        git::GitRepo,
-        test_utils::{RepoAssertions, RepoTestOperations},
-    };
+    use crate::test_utils::{RepoAssertions, RepoTestOperations, create_test_repo};
 
     #[test]
     fn merge_works() -> Result<(), Box<dyn std::error::Error>> {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let repo = GitRepo::init(temp_dir.path()).unwrap();
+        let (_temp_dir, repo) = create_test_repo();
 
         // Add initial commit to master
         repo.add_file_and_commit("README.md", "initial", "Initial commit")?

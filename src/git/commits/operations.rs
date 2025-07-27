@@ -221,10 +221,7 @@ impl GitRepo {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        git::GitRepo,
-        test_utils::{RepoAssertions, RepoTestOperations, create_test_repo},
-    };
+    use crate::test_utils::{RepoAssertions, RepoTestOperations, create_test_repo};
 
     #[test]
     fn list_commits_works_in_repo_without_any_commit() {
@@ -255,9 +252,7 @@ mod tests {
 
     #[test]
     fn add_works_for_single_file_path() -> Result<(), Box<dyn std::error::Error>> {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepo::init(path).unwrap();
+        let (_temp_dir, repo) = create_test_repo();
 
         let file_name = "test_file.txt";
         repo.add_file(file_name, "foo")?.add(&[file_name])?;
@@ -271,9 +266,7 @@ mod tests {
 
     #[test]
     fn add_works_for_glob_patterns() -> Result<(), Box<dyn std::error::Error>> {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepo::init(path).unwrap();
+        let (_temp_dir, repo) = create_test_repo();
 
         repo.add_file("test_file_1.txt", "foo")?
             .add_file("test_file_2.txt", "foo")?
@@ -288,9 +281,7 @@ mod tests {
 
     #[test]
     fn add_works_for_all_files() -> Result<(), Box<dyn std::error::Error>> {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepo::init(path).unwrap();
+        let (_temp_dir, repo) = create_test_repo();
 
         repo.add_file("test_file_1.txt", "foo")?
             .add_file("test_file_2.txt", "foo")?
@@ -305,9 +296,7 @@ mod tests {
 
     #[test]
     fn has_staged_changes_works() -> Result<(), Box<dyn std::error::Error>> {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepo::init(path).unwrap();
+        let (_temp_dir, repo) = create_test_repo();
 
         // Initially no staged changes
         assert!(!repo.has_staged_changes().unwrap());
@@ -333,9 +322,7 @@ mod tests {
 
     #[test]
     fn diff_staged_works() -> Result<(), Box<dyn std::error::Error>> {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepo::init(path).unwrap();
+        let (_temp_dir, repo) = create_test_repo();
 
         // No staged changes initially
         let diff = repo.diff_staged().unwrap();
@@ -367,9 +354,7 @@ mod tests {
 
     #[test]
     fn get_staged_diff_and_diff_to_string_work() -> Result<(), Box<dyn std::error::Error>> {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepo::init(path).unwrap();
+        let (_temp_dir, repo) = create_test_repo();
 
         // Add and stage a file
         repo.add_file("test.txt", "Hello World")?
@@ -391,9 +376,7 @@ mod tests {
 
     #[test]
     fn get_branch_commit_info_works() -> Result<(), Box<dyn std::error::Error>> {
-        let temp_dir = assert_fs::TempDir::new().unwrap();
-        let path = temp_dir.path();
-        let repo = GitRepo::init(path).unwrap();
+        let (_temp_dir, repo) = create_test_repo();
 
         // Add initial commit
         repo.add_file_and_commit("README.md", "initial", "Initial commit")?;
