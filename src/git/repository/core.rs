@@ -98,6 +98,24 @@ impl GitRepo {
     pub(crate) fn repo(&self) -> &Repository {
         &self.repo
     }
+
+    /// Set user configuration for commits
+    pub fn set_user_config(&self, name: &str, email: &str) -> Result<(), Error> {
+        let mut config = self
+            .repo()
+            .config()
+            .context("Failed to get repository config")?;
+
+        config
+            .set_str("user.name", name)
+            .context("Failed to set user.name")?;
+
+        config
+            .set_str("user.email", email)
+            .context("Failed to set user.email")?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

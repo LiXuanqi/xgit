@@ -116,7 +116,7 @@ impl GitRepo {
 mod tests {
     use crate::{
         git::{GitRepo, repository::core::RemoteInfo},
-        test_utils::RepoTestOperations,
+        test_utils::{RepoTestOperations, create_test_bare_repo, create_test_repo},
     };
 
     #[test]
@@ -218,18 +218,14 @@ mod tests {
 
     #[test]
     fn push_works() {
-        let local_dir = assert_fs::TempDir::new().unwrap();
-        let remote_dir = assert_fs::TempDir::new().unwrap();
-
-        // Setup remote repository
-        let remote_repo = GitRepo::init_bare(remote_dir.path()).unwrap();
+        let (_remote_dir, remote_repo) = create_test_bare_repo();
 
         // Verify remote is empty
         let remote_branches = remote_repo.get_all_branches().unwrap();
         assert_eq!(remote_branches.len(), 0);
 
         // Setup local repository
-        let local_repo = GitRepo::init(local_dir.path()).unwrap();
+        let (_local_dir, local_repo) = create_test_repo();
         local_repo
             .add_file_and_commit("test.txt", "content", "Initial commit")
             .unwrap();
@@ -247,14 +243,10 @@ mod tests {
 
     #[test]
     fn push_current_branch_works() {
-        let local_dir = assert_fs::TempDir::new().unwrap();
-        let remote_dir = assert_fs::TempDir::new().unwrap();
-
-        // Setup remote repository
-        let remote_repo = GitRepo::init_bare(remote_dir.path()).unwrap();
+        let (_remote_dir, remote_repo) = create_test_bare_repo();
 
         // Setup local repository
-        let local_repo = GitRepo::init(local_dir.path()).unwrap();
+        let (_local_dir, local_repo) = create_test_repo();
         local_repo
             .add_file_and_commit("test.txt", "content", "Initial commit")
             .unwrap();
@@ -280,14 +272,10 @@ mod tests {
 
     #[test]
     fn push_to_origin_works() {
-        let local_dir = assert_fs::TempDir::new().unwrap();
-        let remote_dir = assert_fs::TempDir::new().unwrap();
-
-        // Setup remote repository
-        let remote_repo = GitRepo::init_bare(remote_dir.path()).unwrap();
+        let (_remote_dir, remote_repo) = create_test_bare_repo();
 
         // Setup local repository
-        let local_repo = GitRepo::init(local_dir.path()).unwrap();
+        let (_local_dir, local_repo) = create_test_repo();
         local_repo
             .add_file_and_commit("test.txt", "content", "Initial commit")
             .unwrap();

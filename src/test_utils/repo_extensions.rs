@@ -1,6 +1,26 @@
 use crate::git::GitRepo;
 use anyhow::{Context, Error};
 
+/// Create a new temporary repository for testing with user config set up
+#[cfg(test)]
+pub fn create_test_repo() -> (assert_fs::TempDir, GitRepo) {
+    let temp_dir = assert_fs::TempDir::new().unwrap();
+    let path = temp_dir.path();
+    let repo = GitRepo::init(path).unwrap();
+    repo.set_user_config("Test User", "test@example.com")
+        .unwrap();
+    (temp_dir, repo)
+}
+
+/// Create a new temporary bare repository for testing
+#[cfg(test)]
+pub fn create_test_bare_repo() -> (assert_fs::TempDir, GitRepo) {
+    let temp_dir = assert_fs::TempDir::new().unwrap();
+    let path = temp_dir.path();
+    let repo = GitRepo::init_bare(path).unwrap();
+    (temp_dir, repo)
+}
+
 /// Test-only trait that adds assertion methods to GitRepo
 #[cfg(test)]
 pub trait RepoAssertions {
