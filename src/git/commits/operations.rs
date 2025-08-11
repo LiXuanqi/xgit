@@ -221,7 +221,7 @@ impl GitRepo {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::{RepoAssertions, RepoTestOperations, create_test_repo};
+    use crate::test_utils::{create_test_repo, RepoAssertions, RepoTestOperations};
 
     #[test]
     fn list_commits_works_in_repo_without_any_commit() {

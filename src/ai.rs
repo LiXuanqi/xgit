@@ -39,12 +39,12 @@ Git diff:
             let response = String::from_utf8_lossy(&output.stdout);
 
             // Parse Claude CLI JSON response and extract the result field
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response)
-                && let Some(message) = json.get("result").and_then(|r| r.as_str())
-            {
-                let message = message.trim();
-                if !message.is_empty() {
-                    return Ok(Some(message.to_string()));
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response) {
+                if let Some(message) = json.get("result").and_then(|r| r.as_str()) {
+                    let message = message.trim();
+                    if !message.is_empty() {
+                        return Ok(Some(message.to_string()));
+                    }
                 }
             }
 

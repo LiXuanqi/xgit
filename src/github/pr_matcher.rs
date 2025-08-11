@@ -37,13 +37,14 @@ impl GitHubPrMatcher {
         }
 
         // Strategy 3: Try with different owner (for forks)
-        if let Ok(fork_owner) = get_fork_owner_from_remote(repo, &self.github_remote)
-            && let Ok(Some(pr)) = self
+        if let Ok(fork_owner) = get_fork_owner_from_remote(repo, &self.github_remote) {
+            if let Ok(Some(pr)) = self
                 .client
                 .find_pr_by_head_branch_with_owner(&fork_owner, branch)
                 .await
-        {
-            return Some(pr);
+            {
+                return Some(pr);
+            }
         }
 
         None
@@ -62,20 +63,20 @@ fn get_github_repo_info(repo: &GitRepo) -> Result<(String, String), Error> {
 fn get_github_remote(repo: &GitRepo) -> Result<String, Error> {
     // Try common remote names in order of preference
     for remote_name in ["origin", "upstream"] {
-        if let Ok(url) = repo.get_remote_url(remote_name)
-            && url.contains("github.com")
-        {
-            return Ok(remote_name.to_string());
+        if let Ok(url) = repo.get_remote_url(remote_name) {
+            if url.contains("github.com") {
+                return Ok(remote_name.to_string());
+            }
         }
     }
 
     // Fallback to first GitHub remote found
     let remotes = repo.get_remotes().context("Failed to get remotes")?;
     for remote in remotes {
-        if let Ok(url) = repo.get_remote_url(&remote.name)
-            && url.contains("github.com")
-        {
-            return Ok(remote.name);
+        if let Ok(url) = repo.get_remote_url(&remote.name) {
+            if url.contains("github.com") {
+                return Ok(remote.name);
+            }
         }
     }
 

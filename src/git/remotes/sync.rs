@@ -237,7 +237,7 @@ impl GitRepo {
 #[cfg(test)]
 mod tests {
     use crate::test_utils::{
-        RepoAssertions, RepoTestOperations, create_test_bare_repo, create_test_repo,
+        create_test_bare_repo, create_test_repo, RepoAssertions, RepoTestOperations,
     };
 
     #[test]

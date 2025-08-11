@@ -165,7 +165,7 @@ impl GitRepo {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::{RepoAssertions, RepoTestOperations, create_test_repo};
+    use crate::test_utils::{create_test_repo, RepoAssertions, RepoTestOperations};
 
     #[test]
     fn merge_works() -> Result<(), Box<dyn std::error::Error>> {

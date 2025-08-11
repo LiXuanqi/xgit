@@ -193,7 +193,7 @@ mod tests {
 
     use crate::{
         git::GitRepo,
-        test_utils::{GitRepoTestDecorator, create_test_repo},
+        test_utils::{create_test_repo, GitRepoTestDecorator},
     };
 
     #[test]

@@ -1,7 +1,7 @@
 [package]
 name = "xgit"
-version = "0.2.2"
-edition = "2024"
+version = "0.2.3"
+edition = "2021"
 description = "A enhanced AI-powered Git tool"
 license = "MIT"
 authors = ["Xuanqi Li<lixuanqi1995@gmail.com>"]

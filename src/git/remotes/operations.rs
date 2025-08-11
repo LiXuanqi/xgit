@@ -115,8 +115,8 @@ impl GitRepo {
 #[cfg(test)]
 mod tests {
     use crate::{
-        git::{GitRepo, repository::core::RemoteInfo},
-        test_utils::{RepoTestOperations, create_test_bare_repo, create_test_repo},
+        git::{repository::core::RemoteInfo, GitRepo},
+        test_utils::{create_test_bare_repo, create_test_repo, RepoTestOperations},
     };
 
     #[test]

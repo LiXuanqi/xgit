@@ -70,7 +70,7 @@ impl GitRepo {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::{RepoTestOperations, create_test_bare_repo, create_test_repo};
+    use crate::test_utils::{create_test_bare_repo, create_test_repo, RepoTestOperations};
 
     #[test]
     fn get_remote_tracking_info_works() {
