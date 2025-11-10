@@ -31,6 +31,18 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// Sync local commit stack to GitHub stacked PRs
+    Diff {
+        /// Repair mapping by attaching a PR number to a commit SHA and resyncing
+        #[arg(long, value_names = ["PR_NUMBER", "COMMIT_SHA"], num_args = 2)]
+        repair: Option<Vec<String>>,
+    },
+    /// Explicit git passthrough command (e.g. xgit git diff)
+    Git {
+        /// Git arguments where first arg is the git subcommand
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
     /// External subcommands (passthrough to git)
     #[command(external_subcommand)]
     External(Vec<String>),

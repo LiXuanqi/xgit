@@ -25,6 +25,8 @@ async fn main() {
             dry_run,
         } => commands::branch::handle_branch(*prune_merged, *stats, *dry_run).await,
         Commands::Commit { args } => commands::commit::handle_commit(args),
+        Commands::Diff { repair } => commands::diff::handle_diff(repair).await,
+        Commands::Git { args } => handle_external_command(args),
         Commands::External(args) => handle_external_command(args),
     };
 

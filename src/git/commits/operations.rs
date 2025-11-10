@@ -217,6 +217,60 @@ impl GitRepo {
         let diff = self.get_staged_diff()?;
         self.diff_to_string(&diff)
     }
+
+    /// Return true when the working tree and index are both clean.
+    pub fn is_working_tree_clean(&self) -> Result<bool, Error> {
+        let statuses = self
+            .repo()
+            .statuses(None)
+            .context("Failed to read repository status")?;
+        Ok(statuses.is_empty())
+    }
+
+    /// List commits in (base, head] order from oldest to newest.
+    pub fn list_commits_between(&self, base: &str, head: &str) -> Result<Vec<String>, Error> {
+        let mut revwalk = self.repo().revwalk().context("Failed to create revwalk")?;
+        revwalk
+            .set_sorting(Sort::TOPOLOGICAL | Sort::REVERSE)
+            .context("Failed to set revwalk sorting")?;
+        revwalk
+            .push_range(&format!("{base}..{head}"))
+            .context("Failed to walk commit range")?;
+
+        let mut commits = Vec::new();
+        for oid in revwalk {
+            let oid = oid.context("Failed to read commit from range")?;
+            commits.push(oid.to_string());
+        }
+        Ok(commits)
+    }
+
+    pub fn get_commit_message(&self, commit_sha: &str) -> Result<String, Error> {
+        let oid = git2::Oid::from_str(commit_sha).context("Invalid commit SHA")?;
+        let commit = self
+            .repo()
+            .find_commit(oid)
+            .context("Failed to find commit")?;
+        Ok(commit.message().unwrap_or_default().to_string())
+    }
+
+    pub fn get_commit_subject(&self, commit_sha: &str) -> Result<String, Error> {
+        let oid = git2::Oid::from_str(commit_sha).context("Invalid commit SHA")?;
+        let commit = self
+            .repo()
+            .find_commit(oid)
+            .context("Failed to find commit")?;
+        Ok(commit.summary().unwrap_or_default().to_string())
+    }
+
+    pub fn get_commit_parent_count(&self, commit_sha: &str) -> Result<usize, Error> {
+        let oid = git2::Oid::from_str(commit_sha).context("Invalid commit SHA")?;
+        let commit = self
+            .repo()
+            .find_commit(oid)
+            .context("Failed to find commit")?;
+        Ok(commit.parent_count())
+    }
 }
 
 #[cfg(test)]
