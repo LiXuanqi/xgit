@@ -1,6 +1,6 @@
 [package]
 name = "xgit"
-version = "0.2.5"
+version = "0.2.6"
 edition = "2021"
 rust-version = "1.56"
 description = "A enhanced AI-powered Git tool"
