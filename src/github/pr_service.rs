@@ -54,22 +54,11 @@ impl GitHubPrService {
                 let version = Command::new("gh")
                     .arg("--version")
                     .current_dir(&self.repo_path)
-                    .status()
+                    .output()
                     .context("Failed to execute gh --version. Please install GitHub CLI (`gh`)")?;
-                if !version.success() {
+                if !version.status.success() {
                     return Err(anyhow::anyhow!(
                         "GitHub CLI (`gh`) is required for xgit GitHub operations"
-                    ));
-                }
-
-                let auth = Command::new("gh")
-                    .args(["auth", "status"])
-                    .current_dir(&self.repo_path)
-                    .status()
-                    .context("Failed to execute gh auth status")?;
-                if !auth.success() {
-                    return Err(anyhow::anyhow!(
-                        "GitHub CLI is not authenticated. Run `gh auth login` first."
                     ));
                 }
 
