@@ -249,26 +249,11 @@ Repair this commit with `xgit diff --repair <pr_number> <commit_sha>`.",
             ));
         }
 
-        let synthetic_message = format!(
-            "xgit synthetic sync for PR #{} ({})",
-            pr_number,
-            short_sha(&commit.sha)
-        );
-        let synthetic_sha = repo
-            .create_synthetic_child_commit(&pr.head_sha, &commit.sha, &synthetic_message)
+        repo.force_push_commit_to_branch(remote_name, &commit.sha, &pr.head_ref)
             .with_context(|| {
                 format!(
-                    "Failed to create synthetic commit using parent '{}' and tree from '{}'",
-                    short_sha(&pr.head_sha),
-                    short_sha(&commit.sha)
-                )
-            })?;
-
-        repo.push_commit_to_branch(remote_name, &synthetic_sha, &pr.head_ref)
-            .with_context(|| {
-                format!(
-                    "Failed to push synthetic commit '{}' to PR head branch '{}'",
-                    short_sha(&synthetic_sha),
+                    "Failed to force-push commit '{}' to PR head branch '{}'",
+                    short_sha(&commit.sha),
                     pr.head_ref
                 )
             })?;
@@ -293,7 +278,7 @@ Repair this commit with `xgit diff --repair <pr_number> <commit_sha>`.",
             pr = github
                 .get_pr(pr_number)
                 .await
-                .context("Failed to refresh PR after synthetic push")?;
+                .context("Failed to refresh PR after force-push")?;
         }
 
         rows.push(SyncRow {
