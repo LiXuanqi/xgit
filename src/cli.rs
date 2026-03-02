@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "xgit")]
 #[command(about = "A Git extension tool")]
-#[command(allow_external_subcommands = true)]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
@@ -43,7 +43,4 @@ pub enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// External subcommands (passthrough to git)
-    #[command(external_subcommand)]
-    External(Vec<String>),
 }

@@ -27,7 +27,6 @@ async fn main() {
         Commands::Commit { args } => commands::commit::handle_commit(args),
         Commands::Diff { repair } => commands::diff::handle_diff(repair).await,
         Commands::Git { args } => handle_external_command(args),
-        Commands::External(args) => handle_external_command(args),
     };
 
     if let Err(e) = result {
