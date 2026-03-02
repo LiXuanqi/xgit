@@ -108,3 +108,20 @@ xgit automatically detects GitHub repositories and fetches PR information for ea
    cargo clippy --all-targets -- -D warnings
    ```
 
+### Publish GitHub Release
+
+1. Create and push a version tag:
+   ```bash
+   git tag v0.2.5
+   git push origin v0.2.5
+   ```
+
+2. Create the GitHub release:
+   ```bash
+   gh release create v0.2.5 --title "v0.2.5" --notes "Release notes here"
+   ```
+
+   Or auto-generate notes:
+   ```bash
+   gh release create v0.2.5 --generate-notes
+   ```
