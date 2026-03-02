@@ -2,6 +2,7 @@ use crate::git::GitRepo;
 use crate::github::pr_service::GitHubPrService;
 use anyhow::{Context, Error};
 use console::style;
+use inquire::MultiSelect;
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
@@ -95,7 +96,17 @@ async fn sync_stack(
             continue;
         }
 
-        let rows = sync_existing_prs(repo, github, remote_name, trunk_base, &stack).await?;
+        let selected_prs = prompt_pr_selection(&stack)?;
+        if selected_prs.is_empty() {
+            println!(
+                "{} No PRs selected. Skipping sync.",
+                style("⚠").yellow().bold()
+            );
+            return Ok(());
+        }
+
+        let rows =
+            sync_existing_prs(repo, github, remote_name, trunk_base, &stack, &selected_prs).await?;
         print_summary(&rows);
         return Ok(());
     }
@@ -227,14 +238,18 @@ async fn sync_existing_prs(
     remote_name: &str,
     trunk_base: &str,
     stack: &[StackCommit],
+    selected_prs: &HashSet<u64>,
 ) -> Result<Vec<SyncRow>, Error> {
     let mut rows = Vec::new();
-    let mut prev_pr_number: Option<u64> = None;
 
-    for commit in stack {
+    for (idx, commit) in stack.iter().enumerate() {
         let pr_number = commit
             .pr_number
             .ok_or_else(|| anyhow::anyhow!("Expected trailer after rewrite pass"))?;
+        if !selected_prs.contains(&pr_number) {
+            continue;
+        }
+
         let mut pr = github
             .get_pr(pr_number)
             .await
@@ -258,15 +273,17 @@ Repair this commit with `xgit diff --repair <pr_number> <commit_sha>`.",
                 )
             })?;
 
-        let expected_base = match prev_pr_number {
-            Some(prev) => {
-                github
-                    .get_pr(prev)
-                    .await
-                    .context("Failed to fetch previous PR for base resolution")?
-                    .head_ref
-            }
-            None => trunk_base.to_string(),
+        let expected_base = if idx == 0 {
+            trunk_base.to_string()
+        } else {
+            let prev_pr = stack[idx - 1]
+                .pr_number
+                .ok_or_else(|| anyhow::anyhow!("Missing previous PR trailer in full stack"))?;
+            github
+                .get_pr(prev_pr)
+                .await
+                .context("Failed to fetch previous PR for base resolution")?
+                .head_ref
         };
 
         if pr.base_ref != expected_base {
@@ -288,11 +305,41 @@ Repair this commit with `xgit diff --repair <pr_number> <commit_sha>`.",
             base_branch: pr.base_ref.clone(),
             url: pr.url.clone(),
         });
-
-        prev_pr_number = Some(pr_number);
     }
 
     Ok(rows)
+}
+
+fn prompt_pr_selection(stack: &[StackCommit]) -> Result<HashSet<u64>, Error> {
+    let mut options = Vec::new();
+    for commit in stack {
+        let pr_number = commit
+            .pr_number
+            .ok_or_else(|| anyhow::anyhow!("Expected PR trailer for selection"))?;
+        options.push(format!(
+            "PR #{}  {}  {}",
+            pr_number,
+            short_sha(&commit.sha),
+            commit.subject
+        ));
+    }
+
+    let selected = MultiSelect::new("Select PRs to sync:", options.clone())
+        .prompt()
+        .context("PR selection was cancelled or failed")?;
+
+    let selected_set: HashSet<String> = selected.into_iter().collect();
+    let mut result = HashSet::new();
+    for (idx, option) in options.iter().enumerate() {
+        if selected_set.contains(option) {
+            let pr = stack[idx]
+                .pr_number
+                .ok_or_else(|| anyhow::anyhow!("Expected PR trailer in selected stack"))?;
+            result.insert(pr);
+        }
+    }
+
+    Ok(result)
 }
 
 #[derive(Debug, Clone)]
