@@ -1,5 +1,5 @@
 use crate::git::GitRepo;
-use crate::github::client::GitHubClient;
+use crate::github::pr_service::GitHubPrService;
 use anyhow::{Context, Error};
 use console::style;
 use std::collections::HashSet;
@@ -33,28 +33,24 @@ pub async fn handle_diff(repair: &Option<Vec<String>>) -> Result<(), Box<dyn std
 
     let remote = detect_github_remote(&repo)?;
     let (owner, repo_name) = parse_github_url(&remote.url)?;
-    let github_client = GitHubClient::new(owner, repo_name)?;
-    let trunk_base = resolve_trunk_base_branch(&repo, &github_client).await?;
+
+    let github = GitHubPrService::new(repo.path(), owner, repo_name)?;
+    github.ensure_ready()?;
+
+    let trunk_base = resolve_trunk_base_branch(&repo, &github).await?;
     let trunk_range = resolve_trunk_range_ref(&repo, &remote.name, &trunk_base)?;
 
     if let Some(repair_args) = repair {
         run_repair(&repo, &trunk_range, repair_args)?;
     }
 
-    sync_stack(
-        &repo,
-        &github_client,
-        &remote.name,
-        &trunk_base,
-        &trunk_range,
-    )
-    .await?;
+    sync_stack(&repo, &github, &remote.name, &trunk_base, &trunk_range).await?;
     Ok(())
 }
 
 async fn sync_stack(
     repo: &GitRepo,
-    github_client: &GitHubClient,
+    github: &GitHubPrService,
     remote_name: &str,
     trunk_base: &str,
     trunk_range: &str,
@@ -89,7 +85,7 @@ async fn sync_stack(
         if !missing_indices.is_empty() {
             create_prs_and_rewrite_missing_tip(
                 repo,
-                github_client,
+                github,
                 remote_name,
                 trunk_base,
                 trunk_range,
@@ -99,7 +95,7 @@ async fn sync_stack(
             continue;
         }
 
-        let rows = sync_existing_prs(repo, github_client, remote_name, trunk_base, &stack).await?;
+        let rows = sync_existing_prs(repo, github, remote_name, trunk_base, &stack).await?;
         print_summary(&rows);
         return Ok(());
     }
@@ -149,7 +145,7 @@ fn run_repair(repo: &GitRepo, trunk_range: &str, repair_args: &[String]) -> Resu
 
 async fn create_prs_and_rewrite_missing_tip(
     repo: &GitRepo,
-    github_client: &GitHubClient,
+    github: &GitHubPrService,
     remote_name: &str,
     trunk_base: &str,
     trunk_range: &str,
@@ -176,7 +172,11 @@ Run `git rebase -i {trunk_base}` and reword commits, then rerun xgit diff."
         let previous = stack[first_missing - 1]
             .pr_number
             .ok_or_else(|| anyhow::anyhow!("Previous commit is missing PR trailer"))?;
-        pr_branch_name(previous)
+        github
+            .get_pr(previous)
+            .await
+            .context("Failed to fetch previous PR for stacked base")?
+            .head_ref
     };
 
     for (idx, commit) in missing_slice.iter().enumerate() {
@@ -187,7 +187,7 @@ Run `git rebase -i {trunk_base}` and reword commits, then rerun xgit diff."
             .context("Failed to push temporary PR head branch")?;
 
         let body = format!("Synced by xgit diff from commit {}", commit.sha);
-        let created = github_client
+        let created = github
             .create_pr(
                 &commit.subject,
                 Some(&body),
@@ -196,16 +196,17 @@ Run `git rebase -i {trunk_base}` and reword commits, then rerun xgit diff."
                 false,
             )
             .await
-            .context("Failed to create PR for commit without trailer")?;
-
-        let canonical = pr_branch_name(created.number);
-        github_client
-            .rename_branch(&temp_branch, &canonical)
-            .await
-            .context("Failed to rename PR head branch to canonical xgit/pr-* name")?;
+            .with_context(|| {
+                format!(
+                    "Failed to create PR for commit {} (head='{}', base='{}')",
+                    short_sha(&commit.sha),
+                    temp_branch,
+                    base_branch
+                )
+            })?;
 
         assigned.push((commit.sha.clone(), created.number));
-        base_branch = canonical;
+        base_branch = created.head_ref;
     }
 
     let base_ref = if first_missing == 0 {
@@ -222,7 +223,7 @@ Run `git rebase -i {trunk_base}` and reword commits, then rerun xgit diff."
 
 async fn sync_existing_prs(
     repo: &GitRepo,
-    github_client: &GitHubClient,
+    github: &GitHubPrService,
     remote_name: &str,
     trunk_base: &str,
     stack: &[StackCommit],
@@ -234,16 +235,12 @@ async fn sync_existing_prs(
         let pr_number = commit
             .pr_number
             .ok_or_else(|| anyhow::anyhow!("Expected trailer after rewrite pass"))?;
-        let mut pr = github_client
-            .get_pr_by_number(pr_number)
+        let mut pr = github
+            .get_pr(pr_number)
             .await
             .context(format!("Failed to fetch PR #{pr_number}"))?;
 
-        if matches!(
-            pr.state,
-            crate::tui::branch_display::PullRequestState::Closed
-        ) || pr.merged
-        {
+        if pr.is_closed_or_merged() {
             return Err(anyhow::anyhow!(
                 "Commit {} maps to PR #{} which is closed/merged. \
 Repair this commit with `xgit diff --repair <pr_number> <commit_sha>`.",
@@ -252,31 +249,25 @@ Repair this commit with `xgit diff --repair <pr_number> <commit_sha>`.",
             ));
         }
 
-        let canonical_head = pr_branch_name(pr_number);
-        if pr.head_ref != canonical_head {
-            github_client
-                .rename_branch(&pr.head_ref, &canonical_head)
-                .await
-                .context("Failed to normalize PR head branch name")?;
-            pr = github_client
-                .get_pr_by_number(pr_number)
-                .await
-                .context("Failed to refresh PR after head-branch rename")?;
-        }
-
-        repo.force_push_commit_to_branch(remote_name, &commit.sha, &canonical_head)
+        repo.force_push_commit_to_branch(remote_name, &commit.sha, &pr.head_ref)
             .context("Failed to force-push commit to PR head branch")?;
 
         let expected_base = match prev_pr_number {
-            Some(prev) => pr_branch_name(prev),
+            Some(prev) => {
+                github
+                    .get_pr(prev)
+                    .await
+                    .context("Failed to fetch previous PR for base resolution")?
+                    .head_ref
+            }
             None => trunk_base.to_string(),
         };
 
         if pr.base_ref != expected_base {
-            pr = github_client
+            pr = github
                 .update_pr(pr_number, Some(&expected_base), None, None)
                 .await
-                .context("Failed to update PR base branch")?;
+                .context("Failed to refresh PR after update")?;
         }
 
         rows.push(SyncRow {
@@ -346,9 +337,9 @@ fn parse_github_url(url: &str) -> Result<(String, String), Error> {
 
 async fn resolve_trunk_base_branch(
     repo: &GitRepo,
-    github_client: &GitHubClient,
+    github: &GitHubPrService,
 ) -> Result<String, Error> {
-    if let Ok(default_branch) = github_client.get_default_branch().await {
+    if let Ok(default_branch) = github.get_default_branch().await {
         return Ok(default_branch);
     }
 
@@ -371,53 +362,14 @@ fn resolve_trunk_range_ref(
     remote_name: &str,
     trunk_base: &str,
 ) -> Result<String, Error> {
-    if let Err(fetch_err) = repo.fetch(remote_name, Some(trunk_base)) {
-        print_fetch_debug(repo, remote_name, trunk_base, &fetch_err);
-        return Err(fetch_err).context(format!(
-            "Failed to fetch remote trunk branch '{remote_name}/{trunk_base}'"
-        ));
-    }
-
     let remote_ref = format!("{remote_name}/{trunk_base}");
     repo.list_commits_between(&remote_ref, "HEAD")
         .context(format!(
-            "Remote-tracking trunk branch '{}' is unavailable after fetch",
+            "Local remote-tracking trunk branch '{}' is unavailable. \
+Run `git fetch {remote_name} {trunk_base}` once to create/update it.",
             remote_ref
         ))?;
     Ok(remote_ref)
-}
-
-fn print_fetch_debug(repo: &GitRepo, remote_name: &str, trunk_base: &str, err: &Error) {
-    let remote_ref = format!("{remote_name}/{trunk_base}");
-    let remote_url = repo
-        .get_remote_url(remote_name)
-        .unwrap_or_else(|_| "<unknown remote url>".to_string());
-    let current_branch = repo
-        .get_current_branch()
-        .unwrap_or_else(|_| "<detached-or-unknown>".to_string());
-
-    let show_ref_result = git_output(
-        repo.path(),
-        &[
-            "show-ref",
-            "--verify",
-            &format!("refs/remotes/{remote_ref}"),
-        ],
-    )
-    .map(|_| "present".to_string())
-    .unwrap_or_else(|e| format!("missing ({e})"));
-
-    eprintln!(
-        "{} debug: trunk fetch failed\n  remote: {} ({})\n  target branch: {}\n  remote-tracking ref: {} [{}]\n  current branch: {}\n  error chain: {:#}",
-        style("⚠").yellow().bold(),
-        style(remote_name).cyan(),
-        style(remote_url).dim(),
-        style(trunk_base).cyan(),
-        style(&remote_ref).cyan(),
-        style(show_ref_result).yellow(),
-        style(current_branch).cyan(),
-        err
-    );
 }
 
 fn collect_stack(repo: &GitRepo, trunk_range_ref: &str) -> Result<Vec<StackCommit>, Error> {
@@ -596,10 +548,6 @@ fn ensure_clean_worktree(repo: &GitRepo) -> Result<(), Error> {
         ));
     }
     Ok(())
-}
-
-fn pr_branch_name(pr_number: u64) -> String {
-    format!("xgit/pr-{pr_number}")
 }
 
 fn short_sha(sha: &str) -> String {

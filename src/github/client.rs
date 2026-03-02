@@ -2,6 +2,7 @@ use crate::tui::branch_display::{PullRequestInfo, PullRequestState};
 use anyhow::{Context, Error};
 use octocrab::Octocrab;
 use serde_json::json;
+use std::env;
 
 #[derive(Debug, Clone)]
 pub struct PullRequestDetails {
@@ -23,9 +24,7 @@ pub struct GitHubClient {
 
 impl GitHubClient {
     pub fn new(owner: String, repo: String) -> Result<Self, Error> {
-        let octocrab = Octocrab::builder()
-            .build()
-            .context("Failed to create GitHub client")?;
+        let octocrab = build_octocrab_from_env().context("Failed to create GitHub client")?;
 
         Ok(Self {
             octocrab,
@@ -172,6 +171,22 @@ impl GitHubClient {
     pub fn repo(&self) -> &str {
         &self.repo
     }
+}
+
+fn build_octocrab_from_env() -> Result<Octocrab, Error> {
+    let token = env::var("GITHUB_TOKEN")
+        .ok()
+        .or_else(|| env::var("GH_TOKEN").ok())
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty());
+
+    let builder = Octocrab::builder();
+    let octocrab = match token {
+        Some(token) => builder.personal_token(token).build(),
+        None => builder.build(),
+    }?;
+
+    Ok(octocrab)
 }
 
 fn to_pull_request_info(pr: &octocrab::models::pulls::PullRequest) -> PullRequestInfo {

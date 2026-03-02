@@ -31,7 +31,11 @@ async fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("{} {}", style("✗").red().bold(), style(e).red());
+        eprintln!(
+            "{} {}",
+            style("✗").red().bold(),
+            style(format!("{e:#}")).red()
+        );
         std::process::exit(1);
     }
 }
