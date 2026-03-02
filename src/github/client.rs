@@ -13,6 +13,7 @@ pub struct PullRequestDetails {
     pub draft: bool,
     pub base_ref: String,
     pub head_ref: String,
+    pub head_sha: String,
     pub merged: bool,
 }
 
@@ -216,6 +217,7 @@ fn to_pull_request_details(pr: &octocrab::models::pulls::PullRequest) -> PullReq
         draft: pr.draft.unwrap_or(false),
         base_ref: pr.base.ref_field.clone(),
         head_ref: pr.head.ref_field.clone(),
+        head_sha: pr.head.sha.clone(),
         merged: pr.merged_at.is_some(),
     }
 }

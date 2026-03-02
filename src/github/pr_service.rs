@@ -12,6 +12,7 @@ pub struct PullRequestRecord {
     pub url: String,
     pub base_ref: String,
     pub head_ref: String,
+    pub head_sha: String,
     pub merged: bool,
 }
 
@@ -107,6 +108,7 @@ impl GitHubPrService {
                     url: pr.url,
                     base_ref: pr.base_ref,
                     head_ref: pr.head_ref,
+                    head_sha: pr.head_sha,
                     merged: pr.merged,
                 })
             }
@@ -139,6 +141,7 @@ impl GitHubPrService {
                     url: pr.url,
                     base_ref: pr.base_ref,
                     head_ref: pr.head_ref,
+                    head_sha: pr.head_sha,
                     merged: pr.merged,
                 })
             }
@@ -172,6 +175,7 @@ impl GitHubPrService {
                     url: pr.url,
                     base_ref: pr.base_ref,
                     head_ref: pr.head_ref,
+                    head_sha: pr.head_sha,
                     merged: pr.merged,
                 })
             }
@@ -203,6 +207,8 @@ struct GhPrViewResponse {
     base_ref_name: String,
     #[serde(rename = "headRefName")]
     head_ref_name: String,
+    #[serde(rename = "headRefOid")]
+    head_ref_oid: String,
     #[serde(rename = "mergedAt")]
     merged_at: Option<String>,
 }
@@ -221,7 +227,7 @@ fn gh_pr_view(
             "--repo",
             repo_slug,
             "--json",
-            "number,state,url,baseRefName,headRefName,mergedAt",
+            "number,state,url,baseRefName,headRefName,headRefOid,mergedAt",
         ],
     )?;
     let parsed: GhPrViewResponse =
@@ -232,6 +238,7 @@ fn gh_pr_view(
         url: parsed.url,
         base_ref: parsed.base_ref_name,
         head_ref: parsed.head_ref_name,
+        head_sha: parsed.head_ref_oid,
         merged: parsed.merged_at.is_some(),
     })
 }
@@ -329,7 +336,7 @@ fn gh_pr_find_by_head(
             "--limit",
             "1",
             "--json",
-            "number,state,url,baseRefName,headRefName,mergedAt",
+            "number,state,url,baseRefName,headRefName,headRefOid,mergedAt",
         ],
     )?;
 
@@ -346,6 +353,7 @@ fn gh_pr_find_by_head(
         url: first.url,
         base_ref: first.base_ref_name,
         head_ref: first.head_ref_name,
+        head_sha: first.head_ref_oid,
         merged: first.merged_at.is_some(),
     })
 }

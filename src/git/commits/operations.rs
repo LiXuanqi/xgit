@@ -271,6 +271,50 @@ impl GitRepo {
             .context("Failed to find commit")?;
         Ok(commit.parent_count())
     }
+
+    /// Create a synthetic child commit:
+    /// - parent is `parent_sha`
+    /// - tree/content is copied from `tree_source_sha`
+    pub fn create_synthetic_child_commit(
+        &self,
+        parent_sha: &str,
+        tree_source_sha: &str,
+        message: &str,
+    ) -> Result<String, Error> {
+        let parent_oid = git2::Oid::from_str(parent_sha).context("Invalid parent commit SHA")?;
+        let parent = self
+            .repo()
+            .find_commit(parent_oid)
+            .context("Failed to find parent commit")?;
+
+        let source_oid =
+            git2::Oid::from_str(tree_source_sha).context("Invalid tree-source commit SHA")?;
+        let source_commit = self
+            .repo()
+            .find_commit(source_oid)
+            .context("Failed to find tree-source commit")?;
+        let source_tree = source_commit
+            .tree()
+            .context("Failed to get source commit tree")?;
+
+        let signature = self
+            .create_signature()
+            .context("Failed to create commit signature")?;
+
+        let commit_id = self
+            .repo()
+            .commit(
+                None,
+                &signature,
+                &signature,
+                message,
+                &source_tree,
+                &[&parent],
+            )
+            .context("Failed to create synthetic child commit")?;
+
+        Ok(commit_id.to_string())
+    }
 }
 
 #[cfg(test)]

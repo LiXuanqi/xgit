@@ -137,6 +137,30 @@ impl GitRepo {
         Ok(())
     }
 
+    /// Push a specific commit SHA to a remote branch (fast-forward only).
+    pub fn push_commit_to_branch(
+        &self,
+        remote_name: &str,
+        commit_sha: &str,
+        branch_name: &str,
+    ) -> Result<(), Error> {
+        let status = Command::new("git")
+            .arg("push")
+            .arg(remote_name)
+            .arg(format!("{commit_sha}:refs/heads/{branch_name}"))
+            .current_dir(self.path())
+            .status()
+            .context("Failed to execute git push")?;
+
+        if !status.success() {
+            return Err(anyhow::anyhow!(
+                "Failed to push commit '{commit_sha}' to '{remote_name}/{branch_name}'"
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Delete a remote branch reference.
     pub fn delete_remote_branch(&self, remote_name: &str, branch_name: &str) -> Result<(), Error> {
         let status = Command::new("git")
