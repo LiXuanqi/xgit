@@ -38,7 +38,7 @@ By default, the installer puts `xg` in `~/.local/bin`.
 Install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/LiXuanqi/xgit/main/scripts/install.sh | sh -s -- --version v0.2.6
+curl -fsSL https://raw.githubusercontent.com/LiXuanqi/xgit/main/scripts/install.sh | sh -s -- --version v0.2.7
 ```
 
 Install to a custom directory:
@@ -118,11 +118,11 @@ cargo clippy --all-targets -- -D warnings
 Push a version tag and GitHub Actions will build Linux `musl` binaries and publish a GitHub Release automatically.
 
 ```bash
-git tag v0.2.6
-git push origin v0.2.6
+git tag v0.2.7
+git push origin v0.2.7
 ```
 
 Release assets produced by the workflow:
 
-- `xg-v0.2.6-x86_64-unknown-linux-musl.tar.gz`
-- `xg-v0.2.6-aarch64-unknown-linux-musl.tar.gz`
+- `xg-v0.2.7-x86_64-unknown-linux-musl.tar.gz`
+- `xg-v0.2.7-aarch64-unknown-linux-musl.tar.gz`

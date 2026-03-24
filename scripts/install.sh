@@ -56,7 +56,7 @@ Usage: install.sh [--dir <install_dir>] [--version <tag>]
 
 Options:
   --dir <install_dir>   Install xg into this directory
-  --version <tag>       Install a specific release tag, for example v0.2.6
+  --version <tag>       Install a specific release tag, for example v0.2.7
   -h, --help            Show this help message
 EOF
 }
