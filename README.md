@@ -115,10 +115,18 @@ cargo clippy --all-targets -- -D warnings
 
 ## Release Flow
 
-Push a version tag and GitHub Actions will build Linux `musl` binaries and publish a GitHub Release automatically.
+GitHub Actions builds Linux `musl` binaries and publishes a GitHub Release whenever you push a version tag.
+
+1. Update the version in `Cargo.toml` and `Cargo.lock`.
+2. Commit the release changes.
+3. Create an annotated tag for the new version.
+4. Push the commit and the tag.
 
 ```bash
+git add Cargo.toml Cargo.lock README.md
+git commit -m "chore: release v0.2.7"
 git tag v0.2.7
+git push origin main
 git push origin v0.2.7
 ```
 
