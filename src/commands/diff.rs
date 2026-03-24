@@ -112,7 +112,7 @@ async fn sync_stack(
     }
 
     Err(anyhow::anyhow!(
-        "Failed to stabilize stack after auto-rewrite. Please rerun xgit diff."
+        "Failed to stabilize stack after auto-rewrite. Please rerun xg diff."
     ))
 }
 
@@ -170,7 +170,7 @@ async fn create_prs_and_rewrite_missing_tip(
     if stack[first_missing..].iter().any(|c| c.pr_number.is_some()) {
         return Err(anyhow::anyhow!(
             "Missing XGit-PR trailers must be contiguous at the tip. \
-Run `git rebase -i {trunk_base}` and reword commits, then rerun xgit diff."
+Run `git rebase -i {trunk_base}` and reword commits, then rerun xg diff."
         ));
     }
 
@@ -197,7 +197,7 @@ Run `git rebase -i {trunk_base}` and reword commits, then rerun xgit diff."
         repo.force_push_commit_to_branch(remote_name, &commit.sha, &temp_branch)
             .context("Failed to push temporary PR head branch")?;
 
-        let body = format!("Synced by xgit diff from commit {}", commit.sha);
+        let body = format!("Synced by xg diff from commit {}", commit.sha);
         let created = github
             .create_pr(
                 &commit.subject,
@@ -258,7 +258,7 @@ async fn sync_existing_prs(
         if pr.is_closed_or_merged() {
             return Err(anyhow::anyhow!(
                 "Commit {} maps to PR #{} which is closed/merged. \
-Repair this commit with `xgit diff --repair <pr_number> <commit_sha>`.",
+Repair this commit with `xg diff --repair <pr_number> <commit_sha>`.",
                 short_sha(&commit.sha),
                 pr_number
             ));
@@ -467,7 +467,7 @@ fn validate_unique_pr_trailers(stack: &[StackCommit]) -> Result<(), Error> {
             if !seen.insert(pr_number) {
                 return Err(anyhow::anyhow!(
                     "Duplicate {} trailer value #{} found in stack. \
-Use `xgit diff --repair <pr_number> <commit_sha>` to fix mapping.",
+Use `xg diff --repair <pr_number> <commit_sha>` to fix mapping.",
                     TRAILER_KEY,
                     pr_number
                 ));
@@ -566,7 +566,7 @@ fn replay_suffix_with_optional_trailer_lookup(
 
     for commit in suffix {
         run_git(repo.path(), &["cherry-pick", &commit.sha]).context(format!(
-            "Cherry-pick conflict while replaying commit {}. Resolve conflict and run `git cherry-pick --continue`, then rerun xgit diff.",
+            "Cherry-pick conflict while replaying commit {}. Resolve conflict and run `git cherry-pick --continue`, then rerun xg diff.",
             short_sha(&commit.sha)
         ))?;
 
@@ -602,7 +602,7 @@ fn amend_head_message(repo_path: &std::path::Path, message: &str) -> Result<(), 
 fn ensure_clean_worktree(repo: &GitRepo) -> Result<(), Error> {
     if !repo.is_working_tree_clean()? {
         return Err(anyhow::anyhow!(
-            "Working tree is not clean. Commit or stash your changes before running xgit diff."
+            "Working tree is not clean. Commit or stash your changes before running xg diff."
         ));
     }
     Ok(())

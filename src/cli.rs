@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "xgit")]
+#[command(name = env!("CARGO_BIN_NAME"))]
 #[command(about = "A Git extension tool")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 pub struct Cli {
@@ -37,7 +37,7 @@ pub enum Commands {
         #[arg(long, value_names = ["PR_NUMBER", "COMMIT_SHA"], num_args = 2)]
         repair: Option<Vec<String>>,
     },
-    /// Explicit git passthrough command (e.g. xgit git diff)
+    /// Explicit git passthrough command (e.g. xg git diff)
     Git {
         /// Git arguments where first arg is the git subcommand
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]

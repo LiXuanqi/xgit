@@ -58,7 +58,7 @@ impl GitHubPrService {
                     .context("Failed to execute gh --version. Please install GitHub CLI (`gh`)")?;
                 if !version.status.success() {
                     return Err(anyhow::anyhow!(
-                        "GitHub CLI (`gh`) is required for xgit GitHub operations"
+                        "GitHub CLI (`gh`) is required for xg GitHub operations"
                     ));
                 }
 

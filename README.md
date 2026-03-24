@@ -13,115 +13,116 @@ An enhanced Git tool built with Rust that provides AI-powered commit messages, i
 
 ## Installation
 
-```bash
-cargo install xgit
-```
+### macOS
 
-## Updating
-
-To update to the latest version:
+Install with Homebrew:
 
 ```bash
-cargo install xgit --force
+brew tap LiXuanqi/xgit
+brew install xgit
 ```
 
-**Note:** The `--force` flag is required to overwrite the existing installation.
+### Linux
+
+Install the latest prebuilt `musl` binary:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LiXuanqi/xgit/main/scripts/install.sh | sh
+```
+
+> [!NOTE]
+> `musl` is a Linux C standard library implementation that makes it easier to ship portable prebuilt binaries. In practice, this means the downloaded `xg` binary should run on most Linux distributions without requiring you to install extra runtime libraries.
+
+By default, the installer puts `xg` in `~/.local/bin`.
+
+Install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LiXuanqi/xgit/main/scripts/install.sh | sh -s -- --version v0.2.6
+```
+
+Install to a custom directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LiXuanqi/xgit/main/scripts/install.sh | sh -s -- --dir /usr/local/bin
+```
+
+### Cargo
+
+Rust users can also install from crates.io:
+
+```bash
+cargo install xgit --bin xg
+```
 
 ## Usage
 
-### Interactive Branch Switching
-Select and switch between branches interactively:
 ```bash
-xgit branch
-# or use the short alias:
-xgit b
+xg <command>
 ```
 
-### Branch Statistics & GitHub PR Tracking
-View comprehensive branch information including GitHub PR status:
+### Interactive Branch Switching
+
 ```bash
-xgit branch --stats
-# or use the short alias:
-xgit b --stats
+xg branch
+xg b
+```
+
+### Branch Statistics
+
+```bash
+xg branch --stats
+xg b --stats
 ```
 
 ### Smart Branch Pruning
-Clean up branches that have been merged to main:
 
 ```bash
-# Preview what would be deleted (recommended first)
-xgit branch --prune-merged --dry-run
-# or use the short alias:
-xgit b --prune-merged --dry-run
+xg branch --prune-merged --dry-run
+xg b --prune-merged --dry-run
 
-# Interactive deletion - select which branches to remove
-xgit branch --prune-merged
-# or use the short alias:
-xgit b --prune-merged
+xg branch --prune-merged
+xg b --prune-merged
 ```
 
 ### AI-Powered Commits
-Generate commit messages automatically using AI:
-```bash
-# Stage your changes first
-git add .
 
-# Use AI to generate commit message
-xgit commit
-# or use the short alias:
-xgit c
+```bash
+git add .
+xg commit
+xg c
 ```
 
 ### Git Passthrough
-Use any git command through xgit:
+
 ```bash
-xgit status
-xgit log
-xgit push
-# ... any git command
+xg git status
+xg git log
+xg git diff
 ```
 
 ## GitHub Integration
 
-xgit automatically detects GitHub repositories and fetches PR information for each branch. Authentication options:
+`xg` uses the GitHub CLI for PR operations in the current default backend. Install and authenticate `gh` if you want PR features such as `xg diff`.
 
-1. **Environment variable**: Set `GITHUB_TOKEN`
-3. **Unauthenticated**: Works with public repos (rate limited)
+## Development
 
-## Development 
+```bash
+cargo build
+cargo test
+cargo clippy --all-targets -- -D warnings
+```
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/LiXuanqi/gitx
-   cd xgit
-   ```
+## Release Flow
 
-2. Install git hooks (recommended):
-   ```bash
-   ./scripts/install-hooks.sh
-   ```
+Push a version tag and GitHub Actions will build Linux `musl` binaries and publish a GitHub Release automatically.
 
-3. Build and test:
-   ```bash
-   cargo build
-   cargo test
-   cargo clippy --all-targets -- -D warnings
-   ```
+```bash
+git tag v0.2.6
+git push origin v0.2.6
+```
 
-### Publish GitHub Release
+Release assets produced by the workflow:
 
-1. Create and push a version tag:
-   ```bash
-   git tag v0.2.5
-   git push origin v0.2.5
-   ```
-
-2. Create the GitHub release:
-   ```bash
-   gh release create v0.2.5 --title "v0.2.5" --notes "Release notes here"
-   ```
-
-   Or auto-generate notes:
-   ```bash
-   gh release create v0.2.5 --generate-notes
-   ```
+- `xg-v0.2.6-x86_64-unknown-linux-musl.tar.gz`
+- `xg-v0.2.6-aarch64-unknown-linux-musl.tar.gz`

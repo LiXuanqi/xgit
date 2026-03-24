@@ -2,6 +2,7 @@
 name = "xgit"
 version = "0.2.6"
 edition = "2021"
+default-run = "xg"
 rust-version = "1.56"
 description = "A enhanced AI-powered Git tool"
 license = "MIT"
@@ -10,6 +11,10 @@ repository = "https://github.com/LiXuanqi/xgit"
 homepage = "https://github.com/LiXuanqi/xgit"
 keywords = ["git", "cli", "ai", "commit", "branch"]
 categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "xg"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.98"
