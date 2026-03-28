@@ -23,10 +23,17 @@ pub struct GitRepo {
 impl GitRepo {
     /// Open a git repository at the specified path
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        Ok(Self {
-            path: path.as_ref().to_path_buf(),
-            repo: Repository::open(path).context("Cannot open git repo at given path")?,
-        })
+        let repo = Repository::discover(path).context("Cannot open git repo at given path")?;
+        let path = if repo.is_bare() {
+            normalize_repo_path(repo.path())
+        } else {
+            normalize_repo_path(
+                repo.workdir()
+                    .ok_or_else(|| anyhow::anyhow!("Non-bare repository has no workdir"))?,
+            )
+        };
+
+        Ok(Self { path, repo })
     }
 
     pub fn init<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
@@ -118,8 +125,14 @@ impl GitRepo {
     }
 }
 
+fn normalize_repo_path(path: &Path) -> PathBuf {
+    path.components().collect()
+}
+
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use git2::Repository;
 
     use crate::{git::GitRepo, test_utils::RepoAssertions};
@@ -131,7 +144,27 @@ mod tests {
         Repository::init(path).unwrap();
         let repo = GitRepo::open(path);
 
-        assert_eq!(repo.unwrap().path(), temp_dir.path());
+        assert_eq!(
+            fs::canonicalize(repo.unwrap().path()).unwrap(),
+            fs::canonicalize(temp_dir.path()).unwrap()
+        );
+    }
+
+    #[test]
+    fn open_works_from_nested_directory() {
+        let temp_dir = assert_fs::TempDir::new().unwrap();
+        let path = temp_dir.path();
+        Repository::init(path).unwrap();
+
+        let nested_dir = path.join("foo").join("bar");
+        fs::create_dir_all(&nested_dir).unwrap();
+
+        let repo = GitRepo::open(&nested_dir).unwrap();
+
+        assert_eq!(
+            fs::canonicalize(repo.path()).unwrap(),
+            fs::canonicalize(temp_dir.path()).unwrap()
+        );
     }
 
     #[test]
