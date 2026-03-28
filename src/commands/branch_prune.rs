@@ -1,15 +1,15 @@
-use crate::git::GitRepo;
+use crate::{git::GitRepo, github::GitHubPrMatcher};
 use console::style;
 use inquire::MultiSelect;
 
-/// Prune local branches that have been merged to main
-///
-/// This function:
-/// - Finds all local branches that are merged to main
-/// - Skips main/master and current branch for safety
-/// - Shows what will be deleted (dry-run mode) or actually deletes branches
-/// - Provides clear user feedback about what's being deleted and why
-pub fn prune_merged_branches(dry_run: bool) -> Result<(), Box<dyn std::error::Error>> {
+#[derive(Debug, Clone)]
+struct PruneCandidate {
+    branch: String,
+    reason: String,
+}
+
+/// Prune local branches that have either been merged into trunk or merged via GitHub and deleted remotely.
+pub async fn prune_merged_branches(dry_run: bool) -> Result<(), Box<dyn std::error::Error>> {
     let repo = GitRepo::open(".")?;
 
     println!(
@@ -23,7 +23,7 @@ pub fn prune_merged_branches(dry_run: bool) -> Result<(), Box<dyn std::error::Er
     );
     println!();
 
-    let branches_to_prune = find_branches_to_prune(&repo)?;
+    let branches_to_prune = find_branches_to_prune(&repo).await?;
 
     if branches_to_prune.is_empty() {
         println!(
@@ -42,40 +42,85 @@ pub fn prune_merged_branches(dry_run: bool) -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
-/// Find branches that can be safely pruned
-fn find_branches_to_prune(repo: &GitRepo) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+async fn find_branches_to_prune(
+    repo: &GitRepo,
+) -> Result<Vec<PruneCandidate>, Box<dyn std::error::Error>> {
     let all_branches = repo.get_all_branches()?;
     let current_branch = repo.get_current_branch()?;
     let mut branches_to_prune = Vec::new();
-
-    // Protected branches that should never be pruned
     let protected_branches = ["main", "master", "develop"];
 
+    let github_matcher = GitHubPrMatcher::new(repo).ok();
+    let mut trunk_branch = None;
+    if let Some(ref matcher) = github_matcher {
+        let fetch_result = repo.fetch_prune(matcher.remote_name(), None);
+        if let Err(err) = fetch_result {
+            println!(
+                "{} Warning: Failed to refresh remote-tracking branches before squash-merge checks: {}",
+                style("⚠").yellow(),
+                err
+            );
+        } else if let Ok(resolved_trunk) = matcher.service().resolve_trunk_base_branch(repo).await {
+            trunk_branch = Some(resolved_trunk);
+        }
+    }
+
     for branch in all_branches {
-        // Skip current branch
         if branch == current_branch {
             continue;
         }
-
-        // Skip protected branches
         if protected_branches.contains(&branch.as_str()) {
             continue;
         }
 
-        // Check if branch is merged to main
         match repo.is_branch_merged_to_main(&branch) {
             Ok(true) => {
-                branches_to_prune.push(branch);
+                branches_to_prune.push(PruneCandidate {
+                    branch,
+                    reason: "merged into local trunk".to_string(),
+                });
+                continue;
             }
-            Ok(false) => {
-                // Branch not merged, skip
-            }
-            Err(e) => {
+            Ok(false) => {}
+            Err(err) => {
                 println!(
                     "{} Warning: Could not determine merge status for '{}': {}",
                     style("⚠").yellow(),
                     style(&branch).cyan(),
-                    e
+                    err
+                );
+            }
+        }
+
+        let (Some(matcher), Some(trunk_branch)) = (&github_matcher, trunk_branch.as_deref()) else {
+            continue;
+        };
+
+        match matcher.refresh_pr_for_branch(repo, &branch).await {
+            Ok(Some(resolved_pr))
+                if resolved_pr.record.is_merged()
+                    && resolved_pr.record.base_ref == trunk_branch
+                    && !repo.remote_tracking_branch_exists(&format!(
+                        "{}/{}",
+                        matcher.remote_name(),
+                        resolved_pr.record.head_ref
+                    )) =>
+            {
+                branches_to_prune.push(PruneCandidate {
+                    branch,
+                    reason: format!(
+                        "PR #{} merged to {} and remote head deleted",
+                        resolved_pr.record.pr_number, trunk_branch
+                    ),
+                });
+            }
+            Ok(_) => {}
+            Err(err) => {
+                println!(
+                    "{} Warning: Could not refresh PR state for '{}': {}",
+                    style("⚠").yellow(),
+                    style(&branch).cyan(),
+                    err
                 );
             }
         }
@@ -84,8 +129,7 @@ fn find_branches_to_prune(repo: &GitRepo) -> Result<Vec<String>, Box<dyn std::er
     Ok(branches_to_prune)
 }
 
-/// Show what would be pruned in dry-run mode
-fn show_dry_run_results(branches_to_prune: &[String]) {
+fn show_dry_run_results(branches_to_prune: &[PruneCandidate]) {
     println!(
         "{} The following {} branches would be deleted:",
         style("📋").cyan().bold(),
@@ -93,12 +137,12 @@ fn show_dry_run_results(branches_to_prune: &[String]) {
     );
     println!();
 
-    for branch in branches_to_prune {
+    for candidate in branches_to_prune {
         println!(
             "  {} {} {}",
             style("🗑").red(),
-            style(branch).cyan().bold(),
-            style("(merged to main)").dim()
+            style(&candidate.branch).cyan().bold(),
+            style(format!("({})", candidate.reason)).dim()
         );
     }
 
@@ -109,10 +153,9 @@ fn show_dry_run_results(branches_to_prune: &[String]) {
     );
 }
 
-/// Actually prune the branches with interactive selection
 fn prune_branches(
     repo: &GitRepo,
-    branches_to_prune: &[String],
+    branches_to_prune: &[PruneCandidate],
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "{} Found {} merged branches. Select which ones to delete:",
@@ -121,23 +164,21 @@ fn prune_branches(
     );
     println!();
 
-    // Show branch details for context
-    for branch in branches_to_prune {
+    for candidate in branches_to_prune {
         println!(
             "  {} {} {}",
             style("•").dim(),
-            style(branch).cyan().bold(),
-            style("(merged to main)").dim()
+            style(&candidate.branch).cyan().bold(),
+            style(format!("({})", candidate.reason)).dim()
         );
     }
     println!();
 
-    // Interactive selection
-    let branches_to_delete = MultiSelect::new(
-        "Select branches to delete:",
-        branches_to_prune.iter().map(|s| s.as_str()).collect(),
-    )
-    .prompt()?;
+    let options: Vec<&str> = branches_to_prune
+        .iter()
+        .map(|candidate| candidate.branch.as_str())
+        .collect();
+    let branches_to_delete = MultiSelect::new("Select branches to delete:", options).prompt()?;
 
     if branches_to_delete.is_empty() {
         println!(
@@ -167,12 +208,12 @@ fn prune_branches(
                 );
                 deleted_count += 1;
             }
-            Err(e) => {
+            Err(err) => {
                 println!(
                     "  {} Failed to delete {}: {}",
                     style("✗").red().bold(),
                     style(branch).cyan(),
-                    e
+                    err
                 );
                 failed_count += 1;
             }

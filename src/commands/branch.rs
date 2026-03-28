@@ -10,7 +10,7 @@ pub async fn handle_branch(
     dry_run: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if prune_merged {
-        return prune_merged_branches(dry_run);
+        return prune_merged_branches(dry_run).await;
     }
 
     if stats {

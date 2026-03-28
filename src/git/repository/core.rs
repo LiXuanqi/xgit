@@ -96,6 +96,11 @@ impl GitRepo {
         &self.path
     }
 
+    /// Get the git directory for the repository (e.g. `.git` for non-bare repos).
+    pub fn git_dir(&self) -> &Path {
+        self.repo.path()
+    }
+
     /// Check if this is a bare repository
     pub fn is_bare(&self) -> bool {
         self.repo.is_bare()

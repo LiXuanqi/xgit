@@ -1,5 +1,5 @@
+use crate::github::types::{PullRequestStatus, ResolvedPullRequest};
 use console::style;
-use serde::{Deserialize, Serialize};
 
 /// Information about a single branch
 #[derive(Debug)]
@@ -9,7 +9,7 @@ pub struct BranchInfo {
     pub commit_info: Option<String>,
     pub merge_status: MergeStatus,
     pub remote_tracking: Option<String>,
-    pub pull_request: Option<PullRequestInfo>,
+    pub pull_request: Option<ResolvedPullRequest>,
 }
 
 /// Merge status of a branch relative to main
@@ -18,23 +18,6 @@ pub enum MergeStatus {
     Merged,
     NotMerged,
     Unknown,
-}
-
-/// Information about a GitHub pull request
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PullRequestInfo {
-    pub number: u64,
-    pub title: String,
-    pub state: PullRequestState,
-    pub url: String,
-    pub draft: bool,
-}
-
-/// State of a GitHub pull request
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum PullRequestState {
-    Open,
-    Closed,
 }
 
 /// Display branch statistics in a formatted way
@@ -98,25 +81,32 @@ fn display_merge_status(status: &MergeStatus) {
 }
 
 /// Display GitHub pull request information for a branch
-fn display_pull_request_info(pull_request: &Option<PullRequestInfo>) {
+fn display_pull_request_info(pull_request: &Option<ResolvedPullRequest>) {
     if let Some(pr) = pull_request {
-        let state_display = match pr.state {
-            PullRequestState::Open => {
-                if pr.draft {
+        let state_display = match pr.record.status {
+            PullRequestStatus::Open => {
+                if pr.record.draft {
                     style("Draft").yellow()
                 } else {
                     style("Open").green()
                 }
             }
-            PullRequestState::Closed => style("Closed").red(),
+            PullRequestStatus::Closed => style("Closed").red(),
+            PullRequestStatus::Merged => style("Merged").green(),
+        };
+        let stale_display = if pr.is_stale {
+            format!(" {}", style("(stale cache)").dim())
+        } else {
+            String::new()
         };
 
         println!(
-            "  {} {} {} {}",
+            "  {} PR #{} {} {}{}",
             style("🔗").yellow(),
-            style(format!("PR #{}", pr.number)).cyan().bold(),
+            style(pr.record.pr_number).cyan().bold(),
             state_display,
-            style(&pr.title).dim()
+            style(&pr.record.title).dim(),
+            stale_display
         );
     } else {
         println!(

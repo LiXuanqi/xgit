@@ -1,26 +1,18 @@
-use crate::{github::client::GitHubClient, tui::branch_display::PullRequestState};
+use crate::{
+    git::GitRepo,
+    github::{
+        client::GitHubClient,
+        pr_index::{JsonPrIndexStore, PrIndexStore},
+        types::{PullRequestRecord, PullRequestSnapshot, PullRequestStatus},
+    },
+};
 use anyhow::{Context, Error};
 use serde::Deserialize;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-#[derive(Debug, Clone)]
-pub struct PullRequestRecord {
-    pub number: u64,
-    pub state: PullRequestState,
-    pub url: String,
-    pub base_ref: String,
-    pub head_ref: String,
-    pub head_sha: String,
-    pub merged: bool,
-}
-
-impl PullRequestRecord {
-    pub fn is_closed_or_merged(&self) -> bool {
-        matches!(self.state, PullRequestState::Closed) || self.merged
-    }
-}
+const DEFAULT_CACHE_TTL_SECS: u64 = 300;
 
 enum Backend {
     GhCli,
@@ -31,6 +23,8 @@ pub struct GitHubPrService {
     backend: Backend,
     repo_slug: String,
     repo_path: PathBuf,
+    store: Box<dyn PrIndexStore>,
+    cache_ttl_secs: u64,
 }
 
 impl GitHubPrService {
@@ -40,11 +34,16 @@ impl GitHubPrService {
             Some("gh") => Backend::GhCli,
             _ => Backend::GhCli,
         };
+        let discovered_repo = git2::Repository::discover(repo_path)
+            .context("Failed to discover repository for PR index")?;
+        let index_path = discovered_repo.path().join("xgit").join("pr-index.json");
 
         Ok(Self {
             backend,
             repo_slug: format!("{owner}/{repo}"),
             repo_path: repo_path.to_path_buf(),
+            store: Box::new(JsonPrIndexStore::new(index_path)),
+            cache_ttl_secs: DEFAULT_CACHE_TTL_SECS,
         })
     }
 
@@ -68,6 +67,14 @@ impl GitHubPrService {
         }
     }
 
+    pub fn repo_slug(&self) -> &str {
+        &self.repo_slug
+    }
+
+    pub fn cache_ttl_secs(&self) -> u64 {
+        self.cache_ttl_secs
+    }
+
     pub async fn get_default_branch(&self) -> Result<String, Error> {
         match &self.backend {
             Backend::GhCli => {
@@ -86,22 +93,103 @@ impl GitHubPrService {
         }
     }
 
-    pub async fn get_pr(&self, pr_number: u64) -> Result<PullRequestRecord, Error> {
-        match &self.backend {
-            Backend::GhCli => gh_pr_view(&self.repo_path, &self.repo_slug, pr_number),
-            Backend::Api(client) => {
-                let pr = client.get_pr_by_number(pr_number).await?;
-                Ok(PullRequestRecord {
-                    number: pr.number,
-                    state: pr.state,
-                    url: pr.url,
-                    base_ref: pr.base_ref,
-                    head_ref: pr.head_ref,
-                    head_sha: pr.head_sha,
-                    merged: pr.merged,
-                })
-            }
+    pub async fn resolve_trunk_base_branch(&self, repo: &GitRepo) -> Result<String, Error> {
+        if let Ok(default_branch) = self.get_default_branch().await {
+            return Ok(default_branch);
         }
+
+        let branches = repo.get_all_branches()?;
+        if branches.iter().any(|branch| branch == "main") {
+            return Ok("main".to_string());
+        }
+        if branches.iter().any(|branch| branch == "master") {
+            return Ok("master".to_string());
+        }
+
+        Err(anyhow::anyhow!(
+            "Unable to determine trunk branch from GitHub default branch or local main/master"
+        ))
+    }
+
+    pub fn get_cached_pr(&self, pr_number: u64) -> Result<Option<PullRequestRecord>, Error> {
+        self.store.get_by_pr(&self.repo_slug, pr_number)
+    }
+
+    pub fn get_cached_by_branch(
+        &self,
+        branch_name: &str,
+    ) -> Result<Option<PullRequestRecord>, Error> {
+        self.store.get_by_branch(&self.repo_slug, branch_name)
+    }
+
+    pub fn get_cached_by_remote_head(
+        &self,
+        remote_head_name: &str,
+    ) -> Result<Option<PullRequestRecord>, Error> {
+        self.store
+            .get_by_remote_head(&self.repo_slug, remote_head_name)
+    }
+
+    pub fn get_cached_by_commit(
+        &self,
+        commit_sha: &str,
+    ) -> Result<Option<PullRequestRecord>, Error> {
+        self.store.get_by_commit(&self.repo_slug, commit_sha)
+    }
+
+    pub fn attach_branch(
+        &self,
+        pr_number: u64,
+        branch_name: &str,
+    ) -> Result<Option<PullRequestRecord>, Error> {
+        self.store
+            .attach_branch(&self.repo_slug, pr_number, branch_name)
+    }
+
+    pub fn attach_remote_head(
+        &self,
+        pr_number: u64,
+        remote_head_name: &str,
+    ) -> Result<Option<PullRequestRecord>, Error> {
+        self.store
+            .attach_remote_head(&self.repo_slug, pr_number, remote_head_name)
+    }
+
+    pub fn attach_commit(
+        &self,
+        pr_number: u64,
+        commit_sha: &str,
+    ) -> Result<Option<PullRequestRecord>, Error> {
+        self.store
+            .attach_commit(&self.repo_slug, pr_number, commit_sha)
+    }
+
+    pub async fn hydrate_pr_from_commit(
+        &self,
+        pr_number: u64,
+        commit_sha: &str,
+        branch_name: Option<&str>,
+    ) -> Result<PullRequestRecord, Error> {
+        let record = match self.get_cached_pr(pr_number)? {
+            Some(record) => record,
+            None => self.get_pr(pr_number).await?,
+        };
+
+        self.attach_commit(pr_number, commit_sha)?;
+        if let Some(branch_name) = branch_name {
+            self.attach_branch(pr_number, branch_name)?;
+        }
+
+        Ok(self.get_cached_pr(pr_number)?.unwrap_or(record))
+    }
+
+    pub async fn get_pr(&self, pr_number: u64) -> Result<PullRequestRecord, Error> {
+        let live = match &self.backend {
+            Backend::GhCli => gh_pr_view(&self.repo_path, &self.repo_slug, pr_number)?,
+            Backend::Api(client) => client.get_pr_by_number(pr_number).await?,
+        };
+
+        self.persist_record(live)
     }
 
     pub async fn create_pr(
@@ -112,7 +200,7 @@ impl GitHubPrService {
         base: &str,
         draft: bool,
     ) -> Result<PullRequestRecord, Error> {
-        match &self.backend {
+        let live = match &self.backend {
             Backend::GhCli => gh_pr_create(
                 &self.repo_path,
                 &self.repo_slug,
@@ -121,20 +209,11 @@ impl GitHubPrService {
                 head,
                 base,
                 draft,
-            ),
-            Backend::Api(client) => {
-                let pr = client.create_pr(title, body, head, base, draft).await?;
-                Ok(PullRequestRecord {
-                    number: pr.number,
-                    state: pr.state,
-                    url: pr.url,
-                    base_ref: pr.base_ref,
-                    head_ref: pr.head_ref,
-                    head_sha: pr.head_sha,
-                    merged: pr.merged,
-                })
-            }
-        }
+            )?,
+            Backend::Api(client) => client.create_pr(title, body, head, base, draft).await?,
+        };
+
+        self.persist_record(live)
     }
 
     pub async fn update_pr(
@@ -144,7 +223,7 @@ impl GitHubPrService {
         title: Option<&str>,
         body: Option<&str>,
     ) -> Result<PullRequestRecord, Error> {
-        match &self.backend {
+        let live = match &self.backend {
             Backend::GhCli => {
                 gh_pr_edit(
                     &self.repo_path,
@@ -154,44 +233,68 @@ impl GitHubPrService {
                     title,
                     body,
                 )?;
-                gh_pr_view(&self.repo_path, &self.repo_slug, pr_number)
+                gh_pr_view(&self.repo_path, &self.repo_slug, pr_number)?
             }
-            Backend::Api(client) => {
-                let pr = client.update_pr(pr_number, base, title, body).await?;
-                Ok(PullRequestRecord {
-                    number: pr.number,
-                    state: pr.state,
-                    url: pr.url,
-                    base_ref: pr.base_ref,
-                    head_ref: pr.head_ref,
-                    head_sha: pr.head_sha,
-                    merged: pr.merged,
-                })
-            }
-        }
+            Backend::Api(client) => client.update_pr(pr_number, base, title, body).await?,
+        };
+
+        self.persist_record(live)
     }
 
-    pub async fn find_pr_by_head(&self, head_branch: &str) -> Result<PullRequestRecord, Error> {
-        match &self.backend {
-            Backend::GhCli => gh_pr_find_by_head(&self.repo_path, &self.repo_slug, head_branch),
-            Backend::Api(client) => {
-                let found = client
-                    .find_pr_by_head_branch(head_branch)
-                    .await?
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("No PR found for head branch '{head_branch}'")
-                    })?;
-                self.get_pr(found.number).await
+    pub async fn find_pr_by_head(
+        &self,
+        head_branch: &str,
+    ) -> Result<Option<PullRequestRecord>, Error> {
+        let live = match &self.backend {
+            Backend::GhCli => gh_pr_find_by_head(&self.repo_path, &self.repo_slug, head_branch)?,
+            Backend::Api(client) => client.find_pr_by_head_branch(head_branch).await?,
+        };
+
+        live.map(|record| self.persist_record(record)).transpose()
+    }
+
+    pub async fn find_pr_by_head_with_owner(
+        &self,
+        owner: &str,
+        head_branch: &str,
+    ) -> Result<Option<PullRequestRecord>, Error> {
+        let live = match &self.backend {
+            Backend::GhCli => {
+                gh_pr_find_by_head_with_owner(&self.repo_path, &self.repo_slug, owner, head_branch)?
             }
-        }
+            Backend::Api(client) => {
+                client
+                    .find_pr_by_head_branch_with_owner(owner, head_branch)
+                    .await?
+            }
+        };
+
+        live.map(|record| self.persist_record(record)).transpose()
+    }
+
+    pub fn mark_refreshed(&self, pr_number: u64) -> Result<Option<PullRequestRecord>, Error> {
+        self.store.mark_refreshed(&self.repo_slug, pr_number)
+    }
+
+    fn persist_record(&self, record: PullRequestRecord) -> Result<PullRequestRecord, Error> {
+        let persisted = self.store.upsert_record(&record)?;
+        let _ = self
+            .store
+            .mark_refreshed(&self.repo_slug, persisted.pr_number)?;
+        Ok(self
+            .get_cached_pr(persisted.pr_number)?
+            .unwrap_or(persisted))
     }
 }
 
 #[derive(Debug, Deserialize)]
 struct GhPrViewResponse {
     number: u64,
+    title: String,
     state: String,
     url: String,
+    #[serde(rename = "isDraft")]
+    is_draft: bool,
     #[serde(rename = "baseRefName")]
     base_ref_name: String,
     #[serde(rename = "headRefName")]
@@ -216,20 +319,12 @@ fn gh_pr_view(
             "--repo",
             repo_slug,
             "--json",
-            "number,state,url,baseRefName,headRefName,headRefOid,mergedAt",
+            "number,title,state,url,isDraft,baseRefName,headRefName,headRefOid,mergedAt",
         ],
     )?;
     let parsed: GhPrViewResponse =
         serde_json::from_str(&output).context("Failed to parse `gh pr view` JSON output")?;
-    Ok(PullRequestRecord {
-        number: parsed.number,
-        state: gh_state_to_pull_request_state(&parsed.state),
-        url: parsed.url,
-        base_ref: parsed.base_ref_name,
-        head_ref: parsed.head_ref_name,
-        head_sha: parsed.head_ref_oid,
-        merged: parsed.merged_at.is_some(),
-    })
+    Ok(gh_response_to_record(repo_slug, parsed))
 }
 
 fn gh_pr_create(
@@ -259,17 +354,18 @@ fn gh_pr_create(
         args.push(body.to_string());
     } else {
         args.push("--body".to_string());
-        args.push("".to_string());
+        args.push(String::new());
     }
 
     if draft {
         args.push("--draft".to_string());
     }
 
-    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let arg_refs: Vec<&str> = args.iter().map(|value| value.as_str()).collect();
     gh_output(repo_path, &arg_refs).context("`gh pr create` failed")?;
-    gh_pr_find_by_head(repo_path, repo_slug, head)
-        .context("PR was created but could not be resolved by head branch")
+
+    gh_pr_find_by_head(repo_path, repo_slug, head)?
+        .ok_or_else(|| anyhow::anyhow!("PR was created but could not be resolved by head branch"))
 }
 
 fn gh_pr_edit(
@@ -301,7 +397,7 @@ fn gh_pr_edit(
         args.push(body.to_string());
     }
 
-    let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    let arg_refs: Vec<&str> = args.iter().map(|value| value.as_str()).collect();
     gh_output(repo_path, &arg_refs).context("`gh pr edit` failed")?;
     Ok(())
 }
@@ -310,7 +406,24 @@ fn gh_pr_find_by_head(
     repo_path: &Path,
     repo_slug: &str,
     head_branch: &str,
-) -> Result<PullRequestRecord, Error> {
+) -> Result<Option<PullRequestRecord>, Error> {
+    gh_pr_list(repo_path, repo_slug, head_branch)
+}
+
+fn gh_pr_find_by_head_with_owner(
+    repo_path: &Path,
+    repo_slug: &str,
+    owner: &str,
+    head_branch: &str,
+) -> Result<Option<PullRequestRecord>, Error> {
+    gh_pr_list(repo_path, repo_slug, &format!("{owner}:{head_branch}"))
+}
+
+fn gh_pr_list(
+    repo_path: &Path,
+    repo_slug: &str,
+    head_selector: &str,
+) -> Result<Option<PullRequestRecord>, Error> {
     let output = gh_output(
         repo_path,
         &[
@@ -319,39 +432,45 @@ fn gh_pr_find_by_head(
             "--repo",
             repo_slug,
             "--head",
-            head_branch,
+            head_selector,
             "--state",
             "all",
             "--limit",
             "1",
             "--json",
-            "number,state,url,baseRefName,headRefName,headRefOid,mergedAt",
+            "number,title,state,url,isDraft,baseRefName,headRefName,headRefOid,mergedAt",
         ],
     )?;
 
     let parsed: Vec<GhPrViewResponse> =
         serde_json::from_str(&output).context("Failed to parse `gh pr list` JSON output")?;
-    let first = parsed
+    Ok(parsed
         .into_iter()
         .next()
-        .ok_or_else(|| anyhow::anyhow!("No PR found for head branch '{}'", head_branch))?;
+        .map(|response| gh_response_to_record(repo_slug, response)))
+}
 
-    Ok(PullRequestRecord {
-        number: first.number,
-        state: gh_state_to_pull_request_state(&first.state),
-        url: first.url,
-        base_ref: first.base_ref_name,
-        head_ref: first.head_ref_name,
-        head_sha: first.head_ref_oid,
-        merged: first.merged_at.is_some(),
+fn gh_response_to_record(repo_slug: &str, response: GhPrViewResponse) -> PullRequestRecord {
+    PullRequestRecord::from_snapshot(PullRequestSnapshot {
+        repo_slug: repo_slug.to_string(),
+        pr_number: response.number,
+        title: response.title,
+        url: response.url,
+        base_ref: response.base_ref_name,
+        head_ref: response.head_ref_name,
+        head_sha: response.head_ref_oid,
+        draft: response.is_draft,
+        status: gh_state_to_pull_request_status(&response.state, response.merged_at.as_deref()),
     })
 }
 
-fn gh_state_to_pull_request_state(state: &str) -> PullRequestState {
-    if state.eq_ignore_ascii_case("closed") || state.eq_ignore_ascii_case("merged") {
-        PullRequestState::Closed
+fn gh_state_to_pull_request_status(state: &str, merged_at: Option<&str>) -> PullRequestStatus {
+    if merged_at.is_some() {
+        PullRequestStatus::Merged
+    } else if state.eq_ignore_ascii_case("closed") {
+        PullRequestStatus::Closed
     } else {
-        PullRequestState::Open
+        PullRequestStatus::Open
     }
 }
 

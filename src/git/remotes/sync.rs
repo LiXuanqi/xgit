@@ -1,10 +1,29 @@
 use anyhow::{Context, Error};
+use git2::{FetchOptions, FetchPrune};
 
 use crate::git::repository::core::GitRepo;
 
 impl GitRepo {
     /// Fetch changes from a remote repository
     pub fn fetch(&self, remote_name: &str, branch_name: Option<&str>) -> Result<String, Error> {
+        self.fetch_with_prune(remote_name, branch_name, false)
+    }
+
+    /// Fetch changes and prune deleted remote-tracking branches.
+    pub fn fetch_prune(
+        &self,
+        remote_name: &str,
+        branch_name: Option<&str>,
+    ) -> Result<String, Error> {
+        self.fetch_with_prune(remote_name, branch_name, true)
+    }
+
+    fn fetch_with_prune(
+        &self,
+        remote_name: &str,
+        branch_name: Option<&str>,
+        prune: bool,
+    ) -> Result<String, Error> {
         let mut remote = self
             .repo()
             .find_remote(remote_name)
@@ -36,8 +55,12 @@ impl GitRepo {
         let refspecs: Vec<&str> = refspecs.iter().map(|s| s.as_str()).collect();
 
         // Perform the fetch
+        let mut fetch_options = FetchOptions::new();
+        if prune {
+            fetch_options.prune(FetchPrune::On);
+        }
         remote
-            .fetch(&refspecs, None, None)
+            .fetch(&refspecs, Some(&mut fetch_options), None)
             .context("Failed to fetch from remote")?;
 
         // Get fetch statistics
@@ -52,6 +75,12 @@ impl GitRepo {
         } else {
             Ok("Already up-to-date".to_string())
         }
+    }
+
+    pub fn remote_tracking_branch_exists(&self, remote_tracking: &str) -> bool {
+        self.repo()
+            .find_reference(&format!("refs/remotes/{remote_tracking}"))
+            .is_ok()
     }
 
     /// Pull changes from a remote repository (fetch + merge)

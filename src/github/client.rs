@@ -1,21 +1,8 @@
-use crate::tui::branch_display::{PullRequestInfo, PullRequestState};
+use crate::github::types::{PullRequestRecord, PullRequestSnapshot, PullRequestStatus};
 use anyhow::{Context, Error};
 use octocrab::Octocrab;
 use serde_json::json;
 use std::env;
-
-#[derive(Debug, Clone)]
-pub struct PullRequestDetails {
-    pub number: u64,
-    pub title: String,
-    pub state: PullRequestState,
-    pub url: String,
-    pub draft: bool,
-    pub base_ref: String,
-    pub head_ref: String,
-    pub head_sha: String,
-    pub merged: bool,
-}
 
 pub struct GitHubClient {
     octocrab: Octocrab,
@@ -37,7 +24,7 @@ impl GitHubClient {
     pub async fn find_pr_by_head_branch(
         &self,
         branch: &str,
-    ) -> Result<Option<PullRequestInfo>, Error> {
+    ) -> Result<Option<PullRequestRecord>, Error> {
         let pulls = self
             .octocrab
             .pulls(&self.owner, &self.repo)
@@ -49,7 +36,7 @@ impl GitHubClient {
             .context("Failed to fetch pull requests")?;
 
         if let Some(pr) = pulls.items.first() {
-            let pr_info = to_pull_request_info(pr);
+            let pr_info = to_pull_request_record(&self.owner, &self.repo, pr);
             Ok(Some(pr_info))
         } else {
             Ok(None)
@@ -60,7 +47,7 @@ impl GitHubClient {
         &self,
         owner: &str,
         branch: &str,
-    ) -> Result<Option<PullRequestInfo>, Error> {
+    ) -> Result<Option<PullRequestRecord>, Error> {
         let pulls = self
             .octocrab
             .pulls(&self.owner, &self.repo)
@@ -72,21 +59,21 @@ impl GitHubClient {
             .context("Failed to fetch pull requests")?;
 
         if let Some(pr) = pulls.items.first() {
-            let pr_info = to_pull_request_info(pr);
+            let pr_info = to_pull_request_record(&self.owner, &self.repo, pr);
             Ok(Some(pr_info))
         } else {
             Ok(None)
         }
     }
 
-    pub async fn get_pr_by_number(&self, pr_number: u64) -> Result<PullRequestDetails, Error> {
+    pub async fn get_pr_by_number(&self, pr_number: u64) -> Result<PullRequestRecord, Error> {
         let pr = self
             .octocrab
             .pulls(&self.owner, &self.repo)
             .get(pr_number)
             .await
             .context("Failed to fetch pull request by number")?;
-        Ok(to_pull_request_details(&pr))
+        Ok(to_pull_request_record(&self.owner, &self.repo, &pr))
     }
 
     pub async fn get_default_branch(&self) -> Result<String, Error> {
@@ -108,7 +95,7 @@ impl GitHubClient {
         head: &str,
         base: &str,
         draft: bool,
-    ) -> Result<PullRequestDetails, Error> {
+    ) -> Result<PullRequestRecord, Error> {
         let pulls = self.octocrab.pulls(&self.owner, &self.repo);
         let mut builder = pulls.create(title, head, base).draft(draft);
         if let Some(body) = body {
@@ -120,7 +107,7 @@ impl GitHubClient {
             .await
             .context("Failed to create pull request")?;
 
-        Ok(to_pull_request_details(&pr))
+        Ok(to_pull_request_record(&self.owner, &self.repo, &pr))
     }
 
     pub async fn update_pr(
@@ -129,7 +116,7 @@ impl GitHubClient {
         base: Option<&str>,
         title: Option<&str>,
         body: Option<&str>,
-    ) -> Result<PullRequestDetails, Error> {
+    ) -> Result<PullRequestRecord, Error> {
         let pulls = self.octocrab.pulls(&self.owner, &self.repo);
         let mut builder = pulls.update(pr_number);
         if let Some(base) = base {
@@ -146,7 +133,7 @@ impl GitHubClient {
             .send()
             .await
             .context("Failed to update pull request")?;
-        Ok(to_pull_request_details(&pr))
+        Ok(to_pull_request_record(&self.owner, &self.repo, &pr))
     }
 
     pub async fn rename_branch(&self, from: &str, to: &str) -> Result<(), Error> {
@@ -190,43 +177,36 @@ fn build_octocrab_from_env() -> Result<Octocrab, Error> {
     Ok(octocrab)
 }
 
-fn to_pull_request_info(pr: &octocrab::models::pulls::PullRequest) -> PullRequestInfo {
-    PullRequestInfo {
-        number: pr.number,
+fn to_pull_request_record(
+    owner: &str,
+    repo: &str,
+    pr: &octocrab::models::pulls::PullRequest,
+) -> PullRequestRecord {
+    PullRequestRecord::from_snapshot(PullRequestSnapshot {
+        repo_slug: format!("{owner}/{repo}"),
+        pr_number: pr.number,
         title: pr.title.clone().unwrap_or_default(),
-        state: to_pull_request_state(pr.state.clone()),
         url: pr
             .html_url
             .as_ref()
             .map(|u| u.to_string())
             .unwrap_or_default(),
-        draft: pr.draft.unwrap_or(false),
-    }
-}
-
-fn to_pull_request_details(pr: &octocrab::models::pulls::PullRequest) -> PullRequestDetails {
-    PullRequestDetails {
-        number: pr.number,
-        title: pr.title.clone().unwrap_or_default(),
-        state: to_pull_request_state(pr.state.clone()),
-        url: pr
-            .html_url
-            .as_ref()
-            .map(|u| u.to_string())
-            .unwrap_or_default(),
-        draft: pr.draft.unwrap_or(false),
         base_ref: pr.base.ref_field.clone(),
         head_ref: pr.head.ref_field.clone(),
         head_sha: pr.head.sha.clone(),
-        merged: pr.merged_at.is_some(),
-    }
+        draft: pr.draft.unwrap_or(false),
+        status: to_pull_request_status(pr),
+    })
 }
 
-fn to_pull_request_state(state: Option<octocrab::models::IssueState>) -> PullRequestState {
-    match state {
-        Some(octocrab::models::IssueState::Open) => PullRequestState::Open,
-        Some(octocrab::models::IssueState::Closed) => PullRequestState::Closed,
-        Some(_) => PullRequestState::Open,
-        None => PullRequestState::Open,
+fn to_pull_request_status(pr: &octocrab::models::pulls::PullRequest) -> PullRequestStatus {
+    if pr.merged_at.is_some() {
+        return PullRequestStatus::Merged;
+    }
+
+    match pr.state.clone() {
+        Some(octocrab::models::IssueState::Closed) => PullRequestStatus::Closed,
+        Some(octocrab::models::IssueState::Open) => PullRequestStatus::Open,
+        Some(_) | None => PullRequestStatus::Open,
     }
 }

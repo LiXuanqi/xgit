@@ -38,11 +38,13 @@ pub async fn handle_diff(repair: &Option<Vec<String>>) -> Result<(), Box<dyn std
     let github = GitHubPrService::new(repo.path(), owner, repo_name)?;
     github.ensure_ready()?;
 
-    let trunk_base = resolve_trunk_base_branch(&repo, &github).await?;
+    let trunk_base = github.resolve_trunk_base_branch(&repo).await?;
     let trunk_range = resolve_trunk_range_ref(&repo, &remote.name, &trunk_base)?;
 
     if let Some(repair_args) = repair {
         run_repair(&repo, &trunk_range, repair_args)?;
+        let repaired_stack = collect_stack(&repo, &trunk_range)?;
+        hydrate_pr_index_from_stack(&repo, &github, &repaired_stack).await?;
     }
 
     sync_stack(&repo, &github, &remote.name, &trunk_base, &trunk_range).await?;
@@ -70,6 +72,7 @@ async fn sync_stack(
 
         validate_linear_stack(repo, &stack)?;
         validate_unique_pr_trailers(&stack)?;
+        hydrate_pr_index_from_stack(repo, github, &stack).await?;
 
         let missing_indices: Vec<usize> = stack
             .iter()
@@ -216,7 +219,10 @@ Run `git rebase -i {trunk_base}` and reword commits, then rerun xg diff."
                 )
             })?;
 
-        assigned.push((commit.sha.clone(), created.number));
+        github
+            .attach_commit(created.pr_number, &commit.sha)
+            .context("Failed to persist commit to PR mapping")?;
+        assigned.push((commit.sha.clone(), created.pr_number));
         base_branch = created.head_ref;
     }
 
@@ -393,28 +399,6 @@ fn parse_github_url(url: &str) -> Result<(String, String), Error> {
     Err(anyhow::anyhow!("Invalid GitHub URL format: {url}"))
 }
 
-async fn resolve_trunk_base_branch(
-    repo: &GitRepo,
-    github: &GitHubPrService,
-) -> Result<String, Error> {
-    if let Ok(default_branch) = github.get_default_branch().await {
-        return Ok(default_branch);
-    }
-
-    // Fallback for unusual API/auth failures: preserve previous local behavior.
-    let branches = repo.get_all_branches()?;
-    if branches.iter().any(|b| b == "main") {
-        return Ok("main".to_string());
-    }
-    if branches.iter().any(|b| b == "master") {
-        return Ok("master".to_string());
-    }
-
-    Err(anyhow::anyhow!(
-        "Unable to determine trunk branch from GitHub default branch or local main/master"
-    ))
-}
-
 fn resolve_trunk_range_ref(
     repo: &GitRepo,
     remote_name: &str,
@@ -445,6 +429,32 @@ fn collect_stack(repo: &GitRepo, trunk_range_ref: &str) -> Result<Vec<StackCommi
         });
     }
     Ok(stack)
+}
+
+async fn hydrate_pr_index_from_stack(
+    repo: &GitRepo,
+    github: &GitHubPrService,
+    stack: &[StackCommit],
+) -> Result<(), Error> {
+    let current_branch = repo.get_current_branch().ok();
+    for commit in stack {
+        let Some(pr_number) = commit.pr_number else {
+            continue;
+        };
+
+        github
+            .hydrate_pr_from_commit(pr_number, &commit.sha, current_branch.as_deref())
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to hydrate local PR record for commit {} -> PR #{}",
+                    short_sha(&commit.sha),
+                    pr_number
+                )
+            })?;
+    }
+
+    Ok(())
 }
 
 fn validate_linear_stack(repo: &GitRepo, stack: &[StackCommit]) -> Result<(), Error> {
